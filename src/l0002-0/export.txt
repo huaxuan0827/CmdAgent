@@ -1,0 +1,24 @@
+######## VARIABLES FROM EXPORT #########
+# tell kind of compilation
+#TYPE:APP,DYNLIB,STALIB,SCRIPT
+TYPE=DYNLIB
+
+# headers, libs, directories need exporting
+EXPORT_HEADER="export/*"
+EXPORT_LIB="libl0002-0.so*"
+#EXPORT_APP
+#EXPORT_MOD
+#EXPORT_SCRIPT
+
+# compilation flags:
+#CFLAGS
+LIBS="-lpthread -lm -ll0001-0"
+#CFLAGS_OVERRIDE
+#LIBS_OVERRIDE
+#NAME_OVERRIDE
+INCLUDEDIR="./"
+
+# for lib, tell version
+MAJOR=1
+MINOR=0
+########################################

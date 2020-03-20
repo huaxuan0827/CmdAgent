@@ -1,0 +1,24 @@
+1.首先下载libevent源码
+wget https://github.com/libevent/libevent/archive/release-2.1.11-stable.tar.gz
+
+本文下载的是libevent 2.1.11。
+2.下载后解压
+tar -zxvf release-2.1.11-stable.tar.gz
+
+3.阅读README
+4.运行autogen.sh
+bash autogen.sh
+
+5.运行遇到 libtoolize: 未找到命令
+sudo apt install libtool
+sudo apt-get install autoconf
+
+6.重新执行autogen.sh
+7. 执行./configure
+8.make
+9.make install
+
+将在/usr/local/include 增加一个event2目录
+/usr/local/lib目录下
+
+https://github.com/huaxuan0827/msgagent.git
