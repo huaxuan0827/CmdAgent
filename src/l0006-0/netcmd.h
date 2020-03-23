@@ -1,7 +1,5 @@
 #ifndef __L0006_NETCMD_H__
 #define __L0006_NETCMD_H__
-
-
 	
 #ifdef PLATFORM_RASPI3B
 #define L0005_PTRTYPE		uint32_t
