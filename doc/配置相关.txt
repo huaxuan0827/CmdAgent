@@ -14,7 +14,7 @@ sudo apt install libtool
 sudo apt-get install autoconf
 
 6.重新执行autogen.sh
-7. 执行./configure
+7.执行./configure
 8.make
 9.make install
 

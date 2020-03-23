@@ -7,8 +7,8 @@
 #define DEVNET_FLAGS_RECEIVEALL				1
 #define DEVNET_FLAGS_CONNECTED				2
 
-#define IS_DEVNET_DROPADDATA(devnet)		((devnet)->flags & NETCOM_FLAGS_DROPADDATA)
-#define IS_DEVNET_CONNECTED(devnet)			((devnet)->flags & NETCOM_FLAGS_CONNECTED)
+#define IS_DEVNET_DROPADDATA(devnet)		((devnet)->flags & DEVNET_FLAGS_DROPADDATA)
+#define IS_DEVNET_CONNECTED(devnet)			((devnet)->flags & DEVNET_FLAGS_CONNECTED)
 
 struct devnet_op{
 	//callback functions
