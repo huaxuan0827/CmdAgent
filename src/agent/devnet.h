@@ -1,7 +1,7 @@
 #ifndef __DEVNET_H__
 #define __DEVNET_H__
 
-#define DEVNET_RDBUFFER_SIZE			10240
+#define DEVNET_RDBUFFER_SIZE		   204800
 
 #define DEVNET_FLAGS_DROPADDATA				0
 #define DEVNET_FLAGS_RECEIVEALL				1
@@ -36,6 +36,7 @@ struct devnet_info{
 	uint32_t rd_off;
 	uint32_t wr_off;
 
+	uint32_t error_count;
 	//callback functions
 	void *op_param;
 	struct devnet_op net_op;
@@ -45,6 +46,7 @@ int devnet_initialize(struct devnet_info *devnet, const char *ipaddr, int port, 
 void devnet_release(struct devnet_info *devnet);
 
 int devnet_connect(struct devnet_info *devnet);
+int devnet_isconnected(struct devnet_info *devnet);
 int devnet_write(struct devnet_info *devnet, void *data, int len);
 void devnet_disconnect(struct devnet_info *devnet);
 void devnet_loop(struct devnet_info *devnet);

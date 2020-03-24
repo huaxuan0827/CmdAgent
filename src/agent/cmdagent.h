@@ -4,7 +4,6 @@
 #include "l0001-0/l0001-0.h"
 #include "l0002-0/l0002-0.h"
 #include "l0003-0/l0003-0.h"
-#include "l0004-0/l0004-0.h"
 #include "l0006-0/l0006-0.h"
 
 
@@ -29,7 +28,6 @@ struct deventity_info {
 	
 	struct tasks_cluster *tcluster;
 };
-
 
 struct cmdagent_info {
 	struct tasks_cluster *tcluster;

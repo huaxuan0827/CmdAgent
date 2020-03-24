@@ -23,14 +23,16 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 {
 	struct devnet_info *devnet = ctx;
 	size_t nread, remain_len;
-	uint32_t space_to_end;
+	uint32_t sapce, space_to_end;
 	uint8_t *packet;
 	struct cmd_packet *packet_head;
 	int errorflag = 0;
 	
 	space_to_end = DEVNET_RDBUFFER_SIZE - devnet->wr_off;
 	nread = bufferevent_read(bev, devnet->data_blob + devnet->wr_off, space_to_end);
-	devnet->wr_off += nread;
+	if( nread > 0){
+		devnet->wr_off += nread;
+	}
 
 	while( devnet->wr_off - devnet->rd_off > CMD_PACKET_HEAD_LEN){
 		packet = devnet->data_blob + devnet->rd_off;
@@ -39,6 +41,7 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 
 		if( packet_head->f.length >= CMD_PACKET_MAX_LENGTH || packet_head->f.length < CMD_PACKET_HEAD_LEN){
 			errorflag = 1;
+			ERRSYS_INFOPRINT("[%s-%d] recv error packet length:%d \n",devnet->ipaddr, devnet->usport,packet_head->f.length);
 			break;
 		}
 		if( packet_head->f.length > remain_len){
@@ -52,14 +55,21 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 	}
 
 	if(errorflag){
-		// reset.
+		// reset buffer!
+		ERRSYS_INFOPRINT("[%s-%d] recv data error, now will reset, wr_off:%d, rd_off:%d !\n", devnet->ipaddr, devnet->usport,
+			devnet->wr_off, devnet->rd_off);
+		
 		evbuffer_drain(bufferevent_get_input(bev), -1);
 		devnet->wr_off = 0;
 		devnet->rd_off = 0;
+		devnet->error_count++;	
+		errorflag = 0;
 	}
 
 	space_to_end = DEVNET_RDBUFFER_SIZE - devnet->wr_off;
 	if( space_to_end < CMD_PACKET_MAX_LENGTH){
+		ERRSYS_INFOPRINT("[%s-%d] wr_off:%d, rd_off:%d, sapce_to_end:%d\n", devnet->ipaddr, devnet->usport,
+			devnet->wr_off, devnet->rd_off, space_to_end);
 		memmove(devnet->data_blob, devnet->data_blob + devnet->rd_off, devnet->wr_off - devnet->rd_off);
 		devnet->rd_off = 0;
 		devnet->wr_off = devnet->wr_off - devnet->rd_off;
@@ -70,25 +80,27 @@ void _devnet_eventcb(struct bufferevent *bev, short events, void *ctx)
 {
 	struct devnet_info *devnet = ctx;
 	
-	if (events & BEV_EVENT_CONNECTED) {
+	if(events & BEV_EVENT_CONNECTED) {
 		evutil_socket_t fd = bufferevent_getfd(bev);
 		int one = 1;
 		setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 		devnet->flags |= DEVNET_FLAGS_CONNECTED;
+
+		printf("connet %s-%d sucess!\n", devnet->ipaddr, devnet->usport);
+		ERRSYS_INFOPRINT("connet %s-%d sucess!\n", devnet->ipaddr, devnet->usport);
 	}else if (events & (BEV_EVENT_ERROR | BEV_EVENT_EOF)) {
 		if (events & BEV_EVENT_ERROR) {
-			ERRSYS_INFOPRINT("%s-%d devcom BEV_EVENT_ERROR\n", devnet->ipaddr, devnet->usport);
+			ERRSYS_ERRPRINT("%s-%d devcom BEV_EVENT_ERROR\n", devnet->ipaddr, devnet->usport);
 		}
 		if (events & BEV_EVENT_EOF) {
-			ERRSYS_INFOPRINT("%s-%d devcom BEV_EVENT_EOF\n", devnet->ipaddr, devnet->usport);
+			ERRSYS_ERRPRINT("%s-%d devcom BEV_EVENT_EOF\n", devnet->ipaddr, devnet->usport);
 		}
 		devnet->flags &= ~DEVNET_FLAGS_CONNECTED;
 		event_base_loopbreak(devnet->base);
-		ERRSYS_ERRPRINT("DSMAINT disconnected\n");
 		ERRSYS_ERRPRINT("%s-%d devcom disconnected\n", devnet->ipaddr, devnet->usport);
 	}
 	else {
-		ERRSYS_ERRPRINT("%s-%d devcom unknown event %d\n", events,devnet->ipaddr, devnet->usport);
+		ERRSYS_ERRPRINT("%s-%d devcom unknown event %d\n",devnet->ipaddr, devnet->usport, events);
 	}
 }
 
@@ -158,6 +170,7 @@ int devnet_connect(struct devnet_info *devnet)
 	if (devnet->bev == NULL) {
 		goto err1;
 	}
+
 	bufferevent_setcb(devnet->bev, _devnet_readcb, NULL, _devnet_eventcb, devnet);
 	bufferevent_enable(devnet->bev, EV_READ | EV_WRITE | EV_PERSIST);
 
@@ -174,9 +187,25 @@ err1:
 	return retval;	
 }
 
+int devnet_isconnected(struct devnet_info *devnet)
+{
+	if( devnet == NULL || devnet->bev == NULL){
+		return 0;
+	}
+	if( devnet->flags & DEVNET_FLAGS_CONNECTED){
+		return 1;
+	}
+	return 0;
+}
+
 int devnet_write(struct devnet_info *devnet, void *data, int len)
 {
 	int retval = -1;
+
+	if(!devnet_isconnected(devnet)){
+		ERRSYS_WARNPRINT("write data, but devnet disconnect\n");
+		return -1;
+	}
 
 	struct evbuffer *output = bufferevent_get_output(devnet->bev);
 	retval = evbuffer_add(output, data, len);

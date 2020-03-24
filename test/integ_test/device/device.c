@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
  
-#define MAXBUFFER 256
+#define MAXBUFFER 10240
 
 int main(int argc, char** argv)
 {
@@ -33,7 +33,7 @@ int main(int argc, char** argv)
     serveraddr.sin_family=AF_INET;
     serveraddr.sin_port=htons(usport);
     inet_pton(AF_INET,ipaddr,&serveraddr.sin_addr);//将c语言字节序转换为网络字节序
-    ret=bind(serverFd,(struct sockaddr *)&serveraddr,sizeof(serveraddr));//绑定IP和端口
+    int ret=bind(serverFd,(struct sockaddr *)&serveraddr,sizeof(serveraddr));//绑定IP和端口
     if(ret!=0){
         close(serverFd);
         printf("bind error:%s\n",strerror(errno));
@@ -51,7 +51,7 @@ int main(int argc, char** argv)
     while (1)
     {
         connfd = accept(serverFd, (struct sockaddr *) &clientaddr, &len);//接受客户端的连接
-        printf("%s 连接到服务器 \n",inet_ntop(AF_INET,&clientaddr.sin_addr,ip,sizeof(ip)));
+        printf("%s 连接到服务器 \n",inet_ntop(AF_INET,&clientaddr.sin_addr,ipaddr,sizeof(ipaddr)));
         if (serverFd < 0)
         {
             printf("accept error : %s\n", strerror(errno));
@@ -59,8 +59,16 @@ int main(int argc, char** argv)
         }
         while((nread= read(connfd,readBuf,MAXBUFFER)))//读客户端发送的数据
         {
-        	sleep(1);
+        	//sleep(1);
+			static int nCount = 0;
+			nCount++;
+			/*if( nCount% 5 == 0){
+				for( unsigned i = 0; i < nread; i++){
+					readBuf[i] = 0xFF;
+				}
+			}*/
             write(connfd,readBuf,nread);//写回客户端
+            //printf("ncount:%d, read:%d \n",nCount, nread);
             bzero(readBuf,MAXBUFFER);
         }
 
