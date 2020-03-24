@@ -32,6 +32,8 @@ struct devnet_info{
 	pthread_rwlockattr_t rwlock_attr;
 	pthread_rwlock_t rwlock;
 	
+	struct devnet_msg msg_list;
+	
 	uint8_t *data_blob;
 	uint32_t rd_off;
 	uint32_t wr_off;
