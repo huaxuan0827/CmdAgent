@@ -49,13 +49,12 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	serclt->nsocket = fd;
 	serclt->flags = SERCLT_FLAGS_DROPADDATA;
 	serclt->evbuffer = newbuffer;
-	INIT_LIST_HEAD(&serclt->list);
 	
 	if( serclt_initialize(serclt, sernet, &sernet->ser_op) != 0){
 		return;
 	}
 	LIST_WLOCK(sernet);
-	list_add(&serclt->list, &sernet->serclt_list.list);	
+	SimuList_Add(&sernet->serclt_list, fd, serclt, 0);
 	LIST_UNLOCK(sernet);
 }
 
@@ -111,13 +110,15 @@ void _sernet_readcb(struct bufferevent* bev,void* arg)
 
 	SimuListNode_t *node = NULL;
 	struct serclt_info *serclt = NULL;
+	
 	LIST_WLOCK(sernet);
 	node = SimuList_Get(&sernet->serclt_list, socketfd);
+	LIST_UNLOCK(sernet);
+	
 	if( node != NULL){
 		serclt = (struct serclt_info *)node->pData;
 		serclt_recvdata(serclt, pbuff, nlen);
 	}
-	LIST_UNLOCK(sernet);
 	if( nlen > 8192){
 		free(pbuff);
 	}
@@ -125,17 +126,63 @@ void _sernet_readcb(struct bufferevent* bev,void* arg)
 
 int sernet_initialize(struct sernet_info *sernet, const char *netpath, void* param, struct serclt_op *op)
 {
-	
+	struct sockaddr_un serun;  
+    int size;  
+
+	SimuList_Create(&sernet->serclt_list);	
+    memset(&serun, 0, sizeof(serun));  
+    serun.sun_family = AF_UNIX;  
+    strcpy(serun.sun_path, netpath);  
+    size = offsetof(struct sockaddr_un, sun_path) + strlen(serun.sun_path);  
+    unlink(netpath); 
+    sernet->evbase = event_base_new();  
+	if(sernet->evbase == NULL){
+
+	}
+	sernet->evlistener = evconnlistener_new_bind(base, _sernet_acceptcb, base,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
+                                      10, (struct sockaddr *)&serun,  size);  
+	if( sernet->evlistener == NULL){
+
+	}
+	return 0;
 }
 
 void sernet_release(struct sernet_info *sernet)
 {
-		
+	SimuListNode_t *pNode = NULL;
+	struct serclt_info *serclt = NULL;
+	
+	LIST_WLOCK(sernet);
+	pNode = sernet->serclt_list.pHead;
+	while( pNode != NULL){
+		serclt = (struct serclt_info *)pNode->pData;
+		serclt_release(serclt);
+		free(serclt);
+		pNode = pNode->pNext;
+	}
+	SimuList_Destory(&sernet->serclt_list, NULL);
+	LIST_UNLOCK(sernet);
+	
+	event_base_loopbreak(sernet->evbase);
+	sleep(1);
+	evconnlistener_free(sernet->evlistener);
+	event_base_free(sernet->evbase);
 }
 
-int sernet_write(struct sernet_info *sernet, void *data, int len, int devid, int seqno)
+int sernet_write(struct sernet_info *sernet, void *data, int len, int serid, int seqno)
 {
+	SimuListNode_t *node = NULL;
+	struct serclt_info *serclt = NULL;
+	int nret = -1;
 	
+	LIST_WLOCK(sernet);
+	node = SimuList_Get(&sernet->serclt_list, serid);
+	if( node != NULL){
+		serclt = (struct serclt_info *)node->pData;
+		nret = serclt_writedata(serclt, data, len);
+	}
+	LIST_UNLOCK(sernet);
+	return nret;
 }
 
 void sernet_loop(struct sernet_info *sernet)

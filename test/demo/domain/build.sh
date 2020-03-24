@@ -2,6 +2,7 @@
 
 gcc server.c -o server
 gcc client.c -o client
+gcc client2.c -o client2
 
 gcc -g -o server2.o -c server2.c -I/usr/local/include
 

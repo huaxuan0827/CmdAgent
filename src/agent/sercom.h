@@ -19,5 +19,3 @@ int sercom_write(struct sercom_proc *serproc, void *data, int len);
 
 #endif
 
-
-

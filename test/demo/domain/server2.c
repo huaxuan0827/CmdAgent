@@ -37,7 +37,8 @@ void socket_error_cb(struct bufferevent *bev, short events, void *arg);
   
     struct bufferevent *bev =  bufferevent_socket_new(base, fd,  
                                                BEV_OPT_CLOSE_ON_FREE);  
-  
+
+	printf("socket fd = %d \n", fd);
     bufferevent_setcb(bev, socket_read_cb, NULL, socket_error_cb, NULL);  
     bufferevent_enable(bev, EV_READ | EV_PERSIST);  
 }  
@@ -47,12 +48,13 @@ void socket_read_cb(struct bufferevent *bev, void *arg)
 {  
     char msg[4096];  
   
-    size_t len = bufferevent_read(bev, msg, sizeof(msg)-1 );  
+    size_t len = bufferevent_read(bev, msg, sizeof(msg)-1 ); 
+	int socketfd = bufferevent_getfd(bev);
   
     msg[len] = '\0';  
-    printf("server read the data %s\n", msg);  
+    printf("server read the data[%d]: %s\n",socketfd, msg);  
   
-    char reply[] = "I has read your data";  
+    char reply[] = "I has read your data\n";  
     bufferevent_write(bev, reply, strlen(reply) );  
 }  
   

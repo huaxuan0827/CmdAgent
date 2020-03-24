@@ -18,6 +18,7 @@
 
 static void _devnet_readcb(struct bufferevent *bev, void *ctx);
 static void _devnet_eventcb(struct bufferevent *bev, short events, void *ctx);
+static void _devnet_msglistclear(SimuList_t *msglist);
 
 void _devnet_readcb(struct bufferevent *bev, void *ctx)
 {
@@ -49,7 +50,24 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 		}
 
 		if( devnet->net_op.dealpacket != NULL){
-			devnet->net_op.dealpacket(devnet->op_param, packet, packet_head->f.length, packet_head->seqno);
+			SimuListNode_t *pnode = NULL;
+			struct devnet_msg *pmsg = NULL;
+			int nserid = -1;
+
+			LIST_WLOCK(devnet);
+			pnode = SimuList_Get(&devnet->msglist, packet_head->seqno);
+			if(pnode != NULL){
+				pmsg = (struct devnet_msg *)pnode->pData;
+				nserid = pmsg->nserid;
+				SimuList_Del(&devnet->msglist, packet_head->seqno);
+			}
+			LIST_UNLOCK(devnet);
+			if(nserid > 0){
+				devnet->net_op.dealpacket(devnet->op_param, packet, packet_head->f.length, packet_head->seqno);
+			}else{
+				ERRSYS_INFOPRINT("[%s-%d] recv missing packet, seqno:%d, length:%d\n",devnet->ipaddr, devnet->usport, 
+					packet_head->seqno, packet_head->f.length);
+			}
 		}
 		devnet->rd_off += packet_head->f.length;
 	}
@@ -58,7 +76,6 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 		// reset buffer!
 		ERRSYS_INFOPRINT("[%s-%d] recv data error, now will reset, wr_off:%d, rd_off:%d !\n", devnet->ipaddr, devnet->usport,
 			devnet->wr_off, devnet->rd_off);
-		
 		evbuffer_drain(bufferevent_get_input(bev), -1);
 		devnet->wr_off = 0;
 		devnet->rd_off = 0;
@@ -104,6 +121,31 @@ void _devnet_eventcb(struct bufferevent *bev, short events, void *ctx)
 	}
 }
 
+void _devnet_msglistclear(SimuList_t *msglist)
+{
+	SimuListNode_t *p1;
+	SimuListNode_t *p2;
+
+	struct devnet_msg *msg = NULL;
+	time_t tnow = time(NULL);
+	
+	p1 = msglist->pHead->pNext;
+	p2 = msglist->pHead;
+	while( p1 != NULL){
+		msg = (struct devnet_msg *)p1->pData;
+		if(tnow - msg->reqtime > CMD_MAX_RESP_TIME_SEC){
+			p2->pNext = p1->pNext;
+			free(msg);
+			free(p1);
+			msglist->nCount--;
+			p1 = p2->pNext;
+		}else{
+			p2 = p1;
+			p1 = p1->pNext;
+		}
+	}
+}
+
 int devnet_initialize(struct devnet_info *devnet,const char *ipaddr, int port, void* param, struct devnet_op *op)
 {
 	int retval;
@@ -130,6 +172,8 @@ int devnet_initialize(struct devnet_info *devnet,const char *ipaddr, int port, v
 		TAKEABREATH();
 		goto err4;
 	}
+
+	SimuList_Create(&devnet->msglist);
 
 	devnet->net_op.dealpacket = op->dealpacket;
 	devnet->flags = DEVNET_FLAGS_DROPADDATA;	
@@ -198,20 +242,38 @@ int devnet_isconnected(struct devnet_info *devnet)
 	return 0;
 }
 
-int devnet_write(struct devnet_info *devnet, void *data, int len)
+int devnet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno)
 {
 	int retval = -1;
+	SimuListNode_t *pnode = NULL;
+	struct devnet_msg *pmsg = NULL;
 
 	if(!devnet_isconnected(devnet)){
 		ERRSYS_WARNPRINT("write data, but devnet disconnect\n");
 		return -1;
 	}
 
+	LIST_WLOCK(devnet);
+	_devnet_msglistclear(&devnet->msglist);
+	pnode = SimuList_Get(&devnet->msglist, seqno);
+	if(pnode != NULL){
+		ERRSYS_WARNPRINT("find the same seqno:%d \n",seqno);
+		LIST_UNLOCK(devnet);
+		return -1;
+	}
+	
 	struct evbuffer *output = bufferevent_get_output(devnet->bev);
 	retval = evbuffer_add(output, data, len);
 	if (retval == -1) {
 		ERRSYS_ERRPRINT("fail to send data length %d\n", len);
+	}else{
+		pmsg = zmalloc(struct devnet_msg);
+		pmsg->nseqno = seqno;
+		pmsg->nserid = serid;
+		pmsg->reqtime = time(NULL);
+		SimuList_Add(&devnet->msglist, seqno, pmsg, 0);
 	}
+	LIST_UNLOCK(devnet);
 	return retval;
 }
 

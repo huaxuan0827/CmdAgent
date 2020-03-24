@@ -1,6 +1,8 @@
 #ifndef __DEVNET_H__
 #define __DEVNET_H__
 
+#include "SimuList.h"
+
 #define DEVNET_RDBUFFER_SIZE		   204800
 
 #define DEVNET_FLAGS_DROPADDATA				0
@@ -17,7 +19,13 @@ struct devnet_op{
 	int (*verifystream)(void*, uint8_t*, uint32_t);	//void *op_param, uint8_t *packet, uint32_t len
 	int (*isvalidpacketheader)(void*, uint8_t*, uint32_t);//void *op_param, uint8_t *packet, uint32_t len
 	int (*getpacketheaderlength)(void*);
-	int (*dealpacket)(void*, uint8_t*, uint32_t, uint32_t);//void *op_param, uint8_t *packet, uint32_t len, uint32_t seqno
+	int (*dealpacket)(void*, uint8_t*, uint32_t, int, int);//void *op_param, uint8_t *packet, uint32_t len,int seqno,int serid
+};
+
+struct devnet_msg{
+	int nserid;
+	int nseqno;
+	time_t reqtime;
 };
 
 struct devnet_info{
@@ -30,9 +38,8 @@ struct devnet_info{
 	struct event *evtimeout;
 
 	pthread_rwlockattr_t rwlock_attr;
-	pthread_rwlock_t rwlock;
-	
-	struct devnet_msg msg_list;
+	pthread_rwlock_t rwlock;	
+	SimuList_t msglist;
 	
 	uint8_t *data_blob;
 	uint32_t rd_off;
@@ -49,7 +56,7 @@ void devnet_release(struct devnet_info *devnet);
 
 int devnet_connect(struct devnet_info *devnet);
 int devnet_isconnected(struct devnet_info *devnet);
-int devnet_write(struct devnet_info *devnet, void *data, int len);
+int devnet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno);
 void devnet_disconnect(struct devnet_info *devnet);
 void devnet_loop(struct devnet_info *devnet);
 void devnet_breakloop(struct devnet_info *devnet);

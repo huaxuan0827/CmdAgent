@@ -38,7 +38,6 @@ struct serclt_info{
 	uint8_t *data_blob;
 	uint32_t rd_off;
 	uint32_t wr_off;
-	SimuList_t msg_list;
 
 	uint32_t error_count;
 	//callback functions

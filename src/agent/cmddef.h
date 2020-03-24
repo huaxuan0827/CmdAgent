@@ -16,5 +16,6 @@ struct cmd_packet{
 #define CMD_PACKET_MAX_LENGTH		2048
 #define CMD_PACKET_HEAD_LEN 		sizeof(struct cmd_packet)
 
+#define CMD_MAX_RESP_TIME_SEC		5
 
 #endif

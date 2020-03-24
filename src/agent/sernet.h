@@ -12,7 +12,6 @@
 #define IS_SERNET_DROPADDATA(devnet)		((devnet)->flags & DEVNET_FLAGS_DROPADDATA)
 #define IS_SERNET_CONNECTED(devnet)			((devnet)->flags & DEVNET_FLAGS_CONNECTED)
 
-
 struct sernet_info{
 	char serpath[32];
 
@@ -30,7 +29,7 @@ struct sernet_info{
 int sernet_initialize(struct devnet_info *devnet, const char *netpath, void* param, struct serclt_op *op);
 void sernet_release(struct devnet_info *devnet);
 
-int sernet_write(struct devnet_info *devnet, void *data, int len, int devid, int seqno);
+int sernet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno);
 void sernet_loop(struct devnet_info *devnet);
 void sernet_breakloop(struct devnet_info *devnet);
 
