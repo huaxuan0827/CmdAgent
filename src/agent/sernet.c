@@ -135,16 +135,23 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, void* par
     strcpy(serun.sun_path, netpath);  
     size = offsetof(struct sockaddr_un, sun_path) + strlen(serun.sun_path);  
     unlink(netpath); 
+	
     sernet->evbase = event_base_new();  
 	if(sernet->evbase == NULL){
-
+		goto err1;
 	}
 	sernet->evlistener = evconnlistener_new_bind(base, _sernet_acceptcb, base,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
                                       10, (struct sockaddr *)&serun,  size);  
 	if( sernet->evlistener == NULL){
-
+		goto err2;	
 	}
+	sernet->ser_op.dealpacket = op->dealpacket;
 	return 0;
+err2:
+	event_base_free(sernet->evbase);
+err1:
+	SimuList_Destory(&sernet->serclt_list, NULL);
+	return -1;
 }
 
 void sernet_release(struct sernet_info *sernet)

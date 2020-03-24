@@ -1,6 +1,13 @@
 #ifndef __CMDDEF_H__
 #define __CMDDEF_H__
 
+#define AGENT_PACKET_HEAD_MAGIC 0xFCFC
+struct agent_packet{
+	uint16_t magic;
+	uint8_t devip[4];
+};
+#define AGENT_PACKET_HEAD_LEN sizeof(struct agnet_packet)
+
 struct cmd_packet{
 	uint16_t magic;
 	uint8_t cmd;

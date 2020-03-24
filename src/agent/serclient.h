@@ -2,15 +2,6 @@
 #define __SERCLT_H__
 #include "SimuList.h"
 
-#define SERCLT_RDBUFFER_SIZE		   204800
-
-#define SERCLT_FLAGS_DROPADDATA			0
-#define SERCLT_FLAGS_RECEIVEALL			1
-#define SERCLT_FLAGS_CONNECTED			2
-
-#define IS_SERCLT_DROPADDATA(devnet)		((devnet)->flags & DEVNET_FLAGS_DROPADDATA)
-#define IS_SERCLT_CONNECTED(devnet)			((devnet)->flags & DEVNET_FLAGS_CONNECTED)
-
 struct serclt_op{
 	//callback functions
 	int (*timeout)(void*);	//void *op_param
@@ -18,7 +9,8 @@ struct serclt_op{
 	int (*verifystream)(void*, uint8_t*, uint32_t);	//void *op_param, uint8_t *packet, uint32_t len
 	int (*isvalidpacketheader)(void*, uint8_t*, uint32_t);//void *op_param, uint8_t *packet, uint32_t len
 	int (*getpacketheaderlength)(void*);
-	int (*dealpacket)(void*, uint8_t*, uint32_t, uint32_t);//void *op_param, uint8_t *packet, uint32_t len, uint32_t seqno
+	//void *op_param,uint8_t *packet,uint32_t len,int seqno,int serid,const char *devip
+	int (*dealpacket)(void*, uint8_t*, uint32_t, int, int ,const char *);
 };
 
 struct serclt_msg{
@@ -28,8 +20,8 @@ struct serclt_msg{
 };
 
 struct serclt_info{	
-	char ipaddr[32];
-	int ndevid;
+	char devAddr[32];
+	int devid;
 	
 	int nsocket;
 	uint32_t flags;		
@@ -48,11 +40,8 @@ struct serclt_info{
 int serclt_initialize(struct serclt_info *serclt, void* param, struct serclt_op *op);
 void serclt_release(struct serclt_info *serclt);
 
-int serclt_connect(struct devnet_info *serclt);
-int serclt_isconnected(struct serclt_info *serclt);
 int serclt_recvdata(struct serclt_info *serclt, void *data, int len);
 int serclt_writedata(struct serclt_info *serclt, void *data, int len);
-void serclt_disconnect(struct serclt_info *serclt);
 
 #endif
 
