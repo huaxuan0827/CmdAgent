@@ -6,10 +6,11 @@
 #define SERCOM_TIMEOUT_PERIOD_US		1000000UL
 #define SERCOM_TIMEOUT_PERIOD_MS		(DEVCOM_TIMEOUT_PERIOD_US / 1000)
 
+#define SERCOM_NET_PATH		"sercom.net"
+
 struct sercom_proc{
 	void *sercom_task;
-	struct devnet_info dev_net;
-	int reconnect_count;
+	struct sernet_info ser_net;
 };
 
 int sercom_initialize(struct process_info *proc, int dev_idx);

@@ -6,7 +6,7 @@ struct agent_packet{
 	uint16_t magic;
 	uint8_t devip[4];
 };
-#define AGENT_PACKET_HEAD_LEN sizeof(struct agnet_packet)
+#define AGENT_PACKET_HEAD_LEN sizeof(struct agent_packet)
 
 struct cmd_packet{
 	uint16_t magic;

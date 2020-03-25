@@ -46,6 +46,9 @@ struct cmdagent_info {
 };
 
 
+int cmdagent_sendto_device(const char *szdevip,void *data, int len, int serid, int seqno);
+
+
 int signal_initialize(struct cmdagent_info *agent_info);
 void cmdagent_exit(struct cmdagent_info *agent_info) ;
 

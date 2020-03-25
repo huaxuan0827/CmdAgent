@@ -26,7 +26,7 @@ struct sernet_info{
 	struct serclt_op ser_op;
 };
 
-int sernet_initialize(struct devnet_info *devnet, const char *netpath, void* param, struct serclt_op *op);
+int sernet_initialize(struct devnet_info *devnet, const char *netpath, struct serclt_op *op);
 void sernet_release(struct devnet_info *devnet);
 
 int sernet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno);

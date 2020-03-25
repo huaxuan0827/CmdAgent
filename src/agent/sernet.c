@@ -47,10 +47,9 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 		return;
 	}
 	serclt->nsocket = fd;
-	serclt->flags = SERCLT_FLAGS_DROPADDATA;
 	serclt->evbuffer = newbuffer;
 	
-	if( serclt_initialize(serclt, sernet, &sernet->ser_op) != 0){
+	if( serclt_initialize(serclt,&sernet->ser_op) != 0){
 		return;
 	}
 	LIST_WLOCK(sernet);
@@ -87,26 +86,8 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 
 void _sernet_readcb(struct bufferevent* bev,void* arg)
 {
-	char tmpbuff[8192];
-	char *pbuff = NULL;
-	size_t nlen = 0;
-	struct evbuffer* input = NULL;
-	int socketfd = 0;
 	struct sernet_info *sernet = (struct sernet_info *)arg;
-
-	socketfd = bufferevent_getfd(bev);
-	input = bufferevent_get_input(bev);
-	nlen = evbuffer_get_length(input);
-
-	if( nlen <= 0){
-		return;
-	}
-	if( nlen > 8192){
-		pbuff = zmalloc(nlen);
-	}else{
-		pbuff = tmpbuff;
-	}
-	evbuffer_remove(input, pbuff, nlen);
+	int socketfd = bufferevent_getfd(bev);
 
 	SimuListNode_t *node = NULL;
 	struct serclt_info *serclt = NULL;
@@ -117,19 +98,32 @@ void _sernet_readcb(struct bufferevent* bev,void* arg)
 	
 	if( node != NULL){
 		serclt = (struct serclt_info *)node->pData;
-		serclt_recvdata(serclt, pbuff, nlen);
-	}
-	if( nlen > 8192){
-		free(pbuff);
+		if( serclt->evbuffer == bev){
+			serclt_recvdata(serclt);
+		}else{
+			ERRSYS_WARNPRINT("sernet_readcb bev:%p != serclt->bev:%p \n", bev, serclt->evbuffer);
+		}
+	}else{
+		ERRSYS_WARNPRINT("sernet_readcb socket:%d, but not find in cltlist!\n", socketfd);
 	}
 }
 
-int sernet_initialize(struct sernet_info *sernet, const char *netpath, void* param, struct serclt_op *op)
+int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct serclt_op *op)
 {
 	struct sockaddr_un serun;  
-    int size;  
+    int size; 
+	int retval = -1;
 
 	SimuList_Create(&sernet->serclt_list);	
+	if(pthread_rwlockattr_init(&sernet->rwlock_attr) < 0) {
+		ERRSYS_FATALPRINT("fail to initialize rwlock attribute for devnet: %s\n", strerror(errno));
+		goto err1;
+	}
+	if(pthread_rwlock_init(&sernet->rwlock,&sernet->rwlock_attr) < 0) {
+		ERRSYS_FATALPRINT("fail to initialize rwlock for devnet: %s\n", strerror(errno));
+		goto err2;
+	}
+	
     memset(&serun, 0, sizeof(serun));  
     serun.sun_family = AF_UNIX;  
     strcpy(serun.sun_path, netpath);  
@@ -138,17 +132,23 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, void* par
 	
     sernet->evbase = event_base_new();  
 	if(sernet->evbase == NULL){
-		goto err1;
+		goto err3;
 	}
-	sernet->evlistener = evconnlistener_new_bind(base, _sernet_acceptcb, base,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
+	sernet->evlistener = evconnlistener_new_bind(sernet->evbase,_sernet_acceptcb,sernet->evbase,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
                                       10, (struct sockaddr *)&serun,  size);  
 	if( sernet->evlistener == NULL){
-		goto err2;	
+		goto err4;	
 	}
-	sernet->ser_op.dealpacket = op->dealpacket;
+	sernet->ser_op.transmitpacket = op->transmitpacket;
+	sernet->ser_op.param = op->param;
+	
 	return 0;
-err2:
+err4:
 	event_base_free(sernet->evbase);
+err3:
+	pthread_rwlock_destroy(&sernet->rwlock);
+err2:
+	pthread_rwlockattr_destroy(&sernet->rwlock_attr);
 err1:
 	SimuList_Destory(&sernet->serclt_list, NULL);
 	return -1;
@@ -187,6 +187,8 @@ int sernet_write(struct sernet_info *sernet, void *data, int len, int serid, int
 	if( node != NULL){
 		serclt = (struct serclt_info *)node->pData;
 		nret = serclt_writedata(serclt, data, len);
+	}else{
+		ERRSYS_WARNPRINT("sernet write, serid:%d, seqno:%d, len:%d, but serclt is disconnect!");
 	}
 	LIST_UNLOCK(sernet);
 	return nret;
