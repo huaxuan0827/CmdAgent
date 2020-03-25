@@ -13,7 +13,7 @@ struct sercom_proc{
 	struct sernet_info ser_net;
 };
 
-int sercom_initialize(struct process_info *proc, int dev_idx);
+int sercom_initialize(struct process_info *proc);
 void sercom_release(struct process_info *proc);
 
 int sercom_write(struct sercom_proc *serproc, void *data, int len);

@@ -14,7 +14,7 @@ struct devcom_proc{
 	int reconnect_count;
 };
 
-int devcom_initialize(struct process_info *proc, int dev_idx);
+int devcom_initialize(struct process_info *proc);
 void devcom_release(struct process_info *proc);
 
 int devcom_write(struct devcom_proc *devproc, void *data, int len, int serid, int seqno);
