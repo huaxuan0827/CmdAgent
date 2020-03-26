@@ -40,7 +40,7 @@ void *thread_proc(void *param){
 			packet->f.length = 2047;
 
 		if( devnet_isconnected(&proc->dev_net)){
-			devnet_write(&proc->dev_net, (void *)szData, packet->f.length);	
+			devnet_write(&proc->dev_net, 12,packet->seqno, (void *)szData, packet->f.length);	
 			printf("Send Cmd seqno:%d, length:%d \n", packet->seqno, packet->f.length);
 		}
 	}
@@ -48,12 +48,12 @@ void *thread_proc(void *param){
 	return 0;
 }
 
-int dealpacket(void* param, uint8_t* data, uint32_t len, uint32_t seqno){
+int dealpacket(void *param,int serid, uint8_t seqno, void *data, int len){
 	struct devcom_proc* proc = (struct devcom_proc *)param;	
 
 	static int scount = 0;
-	if( scount++ % 10 == 0)
-		printf("Recv Cmd seqno:%d, len:%d error_count:%d\n", seqno, len, proc->dev_net.error_count);
+	//if( scount++ % 10 == 0)
+	printf("Recv Cmd serid:%d, seqno:%d, len:%d error_count:%d\n",serid, seqno, len, proc->dev_net.error_count);
 	return 0;
 }
 
@@ -93,8 +93,9 @@ int main(int argc, char *argv[])
 	dev_proc->dev_idx = 0;
 	dev_proc->rack_index = 0;
 	dev_op.dealpacket = dealpacket;
+	dev_op.param = (void *)dev_proc;
 	
-	if( devnet_initialize(&dev_proc->dev_net, ipaddr, usport, dev_proc, &dev_op) < 0){
+	if( devnet_initialize(&dev_proc->dev_net, ipaddr, usport, &dev_op) < 0){
 		return 1;
 	}	
 

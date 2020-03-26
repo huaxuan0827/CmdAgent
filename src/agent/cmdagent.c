@@ -3,9 +3,9 @@
 #include <sys/shm.h>
 #include <errno.h>
 
-#include "cmdagent.h"
 #include "devcom.h"
 #include "sercom.h"
+#include "cmdagent.h"
 
 #define MODNAME			"[A15MT]"
 
@@ -19,7 +19,7 @@ void usage(void)
 
 void cmdagent_version(char *image)
 {
-	printf("%s %s Build: %s %s\n", image, MONITOR_VERSION, __DATE__, __TIME__);
+	printf("%s %s Build: %s %s\n", image, CMDAGENT_VERSION, __DATE__, __TIME__);
 	exit(0);
 }
 
@@ -61,11 +61,12 @@ static int cmdagent_tasks_initialize(struct cmdagent_info *agent)
 	struct task_info *task = tcluster->task;
 
 	/* multiple datasink entities */
-	task_instantiate(tcluster, CMDAGENT_TASK_SERVICE, CMDAGENT_TASK_NAME_SERVICE, 0, sercom_initialize, sercom_release);
+	task_instantiate2(tcluster, CMDAGENT_TASK_SERVICE, CMDAGENT_TASK_NAME_SERVICE, 0, sercom_initialize, sercom_release, (void *)agent);
 	for(i = 0; i < agent->dev_num; i++){
 		sprintf(agent->dev_info[i].taskname, CMDAGENT_TASK_NAME_DEVICE, i);
 		agent->dev_info[i].taskindex = CMDAGENT_TASK_DEVICE + i;
-		task_instantiate2(tcluster, agent->dev_info[i].taskindex, agent->dev_info[i].taskname, 0, devcom_initialize, devcom_release);
+		task_instantiate2(tcluster, agent->dev_info[i].taskindex, agent->dev_info[i].taskname, 0, 
+			devcom_initialize, devcom_release, i);
 	}
 	
 	for (i = 0;i < agent->dev_num + 1;i ++) {
@@ -100,9 +101,7 @@ static int cmdagent_tasks_startup(struct cmdagent_info *agent)
 				goto err1;
 		}
 	}
-
 	return 0;
-
 err1: 
 	for (; i >= 0; i--) {
 		if (task[i].stop) {
@@ -111,7 +110,6 @@ err1:
 	}
 	return retval;
 }
-
 
 void cmdagent_tasks_release(struct cmdagent_info *agent)
 {
@@ -125,11 +123,40 @@ void cmdagent_tasks_release(struct cmdagent_info *agent)
 	}
 }
 
+int cmdagent_initdxt(struct cmdagent_info *agent)
+{
+	return 0;
+}
+
+int cmdagent_uninitdxt(struct cmdagent_info *agent)
+{
+	return 0;
+}
+
+int cmdagnet_initconfig(struct cmdagent_info *agent)
+{
+	int idx = 0;
+	unsigned short usport = 9900;
+
+	evthread_use_pthreads();//enable threads 
+	
+	agent->dev_num = 1;
+	for(idx = 0; idx < agent->dev_num; idx++){
+		strcpy(agent->dev_info[idx].ipaddr, "192.168.245.128");
+		agent->dev_info[idx].usport = usport+idx;
+		agent->dev_info[idx].rack_index = idx;
+	}
+	return 0;
+}
+
+int cmdagent_uninitconfig(struct cmdagent_info *agent)
+{
+	return 0;
+}
 
 int main(int argc, char *argv[])
 {
-	int i;
-	int retval = -1;
+	int i,retval = -1;
 	struct task_info *task;
 	
 	struct cmdagent_info *cmdagent = zmalloc(sizeof(struct cmdagent_info));
@@ -141,6 +168,11 @@ int main(int argc, char *argv[])
 		goto err1;
 	}
 
+	if( cmdagent_initdxt(cmdagent) < 0){
+		ERRSYS_FATALPRINT("init dxt failed\n");
+		goto err2;
+	}
+	
 	if (signal_initialize(cmdagent) < 0) {
 		ERRSYS_FATALPRINT("Fail to register signal handler\n");
 		goto err3;
@@ -154,6 +186,11 @@ int main(int argc, char *argv[])
 	if (singleton_initialize(NULL) < 0) {
 		ERRSYS_FATALPRINT("Fail to initialize singleton\n");
 		goto err3;
+	}
+
+	if( cmdagnet_initconfig(cmdagent) < 0){
+		ERRSYS_FATALPRINT("Fail to parse arguments\n");
+		goto err4;
 	}
 	
 	cmdagent->tcluster = taskcluster_create(cmdagent->dev_num + 1, MODNAME, cmdagent);//modname as cluster task log prefix & pts directory
@@ -191,14 +228,43 @@ int main(int argc, char *argv[])
 err6:
 	taskcluster_release(cmdagent->tcluster);
 err5:
-	
+	cmdagent_uninitconfig(cmdagent);
 err4:
 	singleton_release();
 err3:
-	
+	cmdagent_uninitdxt(cmdagent);
 err2:
 	errsys_release();
 err1:
+	return 0;
+}
+
+int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short usport, int serid, int seqno, void *data, int len)
+{
+	if( szdevip == NULL || usport == 0 || data == 0){
+		return -1;
+	}
+	int idx = 0, nret = -1;
+	struct cmdagent_info *agent = (struct cmdagent_info *)param;
+	int bfind = 0;
+	struct devcom_proc *devproc;
+	
+	for( idx = 0; idx < agent->dev_num; idx++){
+		if( strcmp(szdevip, agent->dev_info[idx].ipaddr) == 0 && usport == agent->dev_info[idx].usport){
+			bfind = 1;
+			break;
+		}
+	}
+	if( !bfind){
+		ERRSYS_WARNPRINT("not find dev ip=%s, port=%d\n", szdevip, usport);
+		return -1;
+	}
+	devproc = (struct devcom_proc *)agent->dev_info[idx].devproc;
+		
+	nret = devcom_write(devproc,serid,seqno,data, len);
+	if( nret < 0){
+		ERRSYS_WARNPRINT("serid:%d, seqno:%d, datalen:%d, write data to dev ip=%s, port=%d\n",serid,seqno,len,szdevip,usport);
+	}
 	return 0;
 }
 

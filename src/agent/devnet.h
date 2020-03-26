@@ -1,6 +1,7 @@
 #ifndef __DEVNET_H__
 #define __DEVNET_H__
 
+#include <stdint.h>
 #include "SimuList.h"
 
 #define DEVNET_RDBUFFER_SIZE		   204800
@@ -13,13 +14,9 @@
 #define IS_DEVNET_CONNECTED(devnet)			((devnet)->flags & DEVNET_FLAGS_CONNECTED)
 
 struct devnet_op{
+	void *param;
 	//callback functions
-	int (*timeout)(void*);	//void *op_param
-	int (*verifycmdpacket)(void*, uint8_t*, uint32_t, uint32_t*);//void *op_param, uint8_t *packet, uint32_t len, uint32_t *seqno
-	int (*verifystream)(void*, uint8_t*, uint32_t);	//void *op_param, uint8_t *packet, uint32_t len
-	int (*isvalidpacketheader)(void*, uint8_t*, uint32_t);//void *op_param, uint8_t *packet, uint32_t len
-	int (*getpacketheaderlength)(void*);
-	int (*dealpacket)(void*, uint8_t*, uint32_t, int, int);//void *op_param, uint8_t *packet, uint32_t len,int seqno,int serid
+	int (*dealpacket)(void*, int,uint8_t,void *, int);//struct devnet_info *devnet,int serid, uint8_t seqno, void *data, int len
 };
 
 struct devnet_msg{
@@ -47,16 +44,15 @@ struct devnet_info{
 
 	uint32_t error_count;
 	//callback functions
-	void *op_param;
 	struct devnet_op net_op;
 };
 
-int devnet_initialize(struct devnet_info *devnet, const char *ipaddr, int port, void* param, struct devnet_op *op);
+int devnet_initialize(struct devnet_info *devnet, const char *ipaddr, int port,struct devnet_op *op);
 void devnet_release(struct devnet_info *devnet);
 
 int devnet_connect(struct devnet_info *devnet);
 int devnet_isconnected(struct devnet_info *devnet);
-int devnet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno);
+int devnet_write(struct devnet_info *devnet,int serid, uint8_t seqno, void *data, int len);
 void devnet_disconnect(struct devnet_info *devnet);
 void devnet_loop(struct devnet_info *devnet);
 void devnet_breakloop(struct devnet_info *devnet);

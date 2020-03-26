@@ -11,6 +11,9 @@
 #include "l0002-0/l0002-0.h"
 #include "l0003-0/l0003-0.h"
 
+#include "cmddef.h"
+#include "serclient.h"
+
 #define MODNAME	 "[A15SC]"
 
 int serclt_initialize(struct serclt_info *serclt, struct serclt_op *op)
@@ -35,7 +38,7 @@ void serclt_release(struct serclt_info *serclt)
 	}
 }
 
-int serclt_recvdata(struct serclt_info *serclt, void *data, int len)
+int serclt_recvdata(struct serclt_info *serclt)
 {
 	size_t nread, remain_len;
 	uint32_t sapce, space_to_end;
@@ -43,7 +46,7 @@ int serclt_recvdata(struct serclt_info *serclt, void *data, int len)
 	struct agent_packet *agent_head;
 	struct cmd_packet *cmd_head;
 	int errorflag = 0;
-	char ipaddr[32];
+	char ipaddr[32] = {0};
 	
 	space_to_end = SERCLT_RDBUFFER_SIZE - serclt->wr_off;
 	nread = bufferevent_read(serclt->evbuffer, serclt->data_blob + serclt->wr_off, space_to_end);
@@ -66,9 +69,8 @@ int serclt_recvdata(struct serclt_info *serclt, void *data, int len)
 		if( cmd_head->f.length > remain_len){
 			break;
 		}
-
 		if( serclt->net_op.transmitpacket != NULL){
-			serclt->net_op.transmitpacket(serclt->op_param, (void *)cmd_head, cmd_head.f.length, cmd_head.seqno, serclt->nsocket, ipaddr);
+			serclt->net_op.transmitpacket(serclt->net_op.param, ipaddr, agent_head->port, serclt->nsocket, cmd_head->seqno,packet + AGENT_PACKET_HEAD_LEN,cmd_head->f.length);
 		}
 		serclt->rd_off += AGENT_PACKET_HEAD_LEN;
 		serclt->rd_off += cmd_head->f.length;
@@ -85,7 +87,7 @@ int serclt_recvdata(struct serclt_info *serclt, void *data, int len)
 		errorflag = 0;
 	}
 
-	space_to_end = DEVNET_RDBUFFER_SIZE - serclt->wr_off;
+	space_to_end = SERCLT_RDBUFFER_SIZE - serclt->wr_off;
 	if( space_to_end < CMD_PACKET_MAX_LENGTH){
 		ERRSYS_INFOPRINT("[%d] wr_off:%d, rd_off:%d, sapce_to_end:%d\n", serclt->nsocket,
 			serclt->wr_off, serclt->rd_off, space_to_end);

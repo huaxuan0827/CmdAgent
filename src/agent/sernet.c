@@ -1,14 +1,26 @@
-#include <event2/event.h>
-#include <event2/bufferevent.h>
-#include <event2/buffer.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
 #include <string.h>
+#include <stdlib.h>  
+#include <stdio.h>  
+#include <stddef.h>  
+#include <sys/socket.h>  
+#include <sys/un.h>  
+#include <errno.h>  
+#include <string.h>  
+#include <unistd.h>  
+#include <ctype.h>  
+#include <netinet/in.h>  
+
+#include <event2/event.h>  
+#include <event2/listener.h>  
+#include <event2/bufferevent.h>  
 
 #include "cmddef.h"
-#include "devnet.h"
+#include "sernet.h"
+#include "serclient.h"
 
 #include "l0001-0/l0001-0.h"
 #include "l0002-0/l0002-0.h"
@@ -17,24 +29,22 @@
 #define MODNAME	 "[A15SN]"
 
 //////////////////////////////////////////////////
-static void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struct sockaddr *address, int socklen, void *arg);
-static void _sernet_eventcb(struct bufferevent* bev, short what, void* arg);
-static void _sernet_readcb(struct bufferevent* bev,void* arg);
+void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struct sockaddr *address, int socklen, void *arg);
+void _sernet_eventcb(struct bufferevent* bev, short what, void* arg);
+void _sernet_readcb(struct bufferevent* bev,void* arg);
 
 //////////////////////////////////////////////////
 
 void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struct sockaddr *address, int socklen, void *arg)
 {
 	struct sernet_info *sernet = (struct sernet_info *)arg;
+	int nlistlen = 0;
+	struct sockaddr_un *sunaddr = NULL;
 
-	int enable = 1;
-	if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char*)&enable, sizeof(enable)) < 0){
-		return;
-	}
-	evthread_make_base_notifiable(sernet->evbase);
+	sunaddr = (struct sockaddr_un *)address;
+	ERRSYS_INFOPRINT("sernet recv new clt fd:%d, netpath:%s\n", fd, sunaddr->sun_path);
 	
-	struct bufferevent* newbuffer = bufferevent_socket_new(sernet->evbase, fd, 
-		/*BEV_OPT_CLOSE_ON_FREE*/BEV_OPT_THREADSAFE | BEV_OPT_UNLOCK_CALLBACKS|BEV_OPT_DEFER_CALLBACKS);
+	struct bufferevent* newbuffer = bufferevent_socket_new(sernet->evbase, fd, BEV_OPT_CLOSE_ON_FREE);
 	if( newbuffer == NULL){
 		 return;
 	}
@@ -42,7 +52,7 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	bufferevent_setcb(newbuffer,_sernet_readcb, NULL,_sernet_eventcb, sernet);
 	bufferevent_enable(newbuffer,EV_READ|EV_WRITE);
 
-	struct serclt_info *serclt = zmalloc(sizeof(serclt_info));
+	struct serclt_info *serclt = zmalloc(sizeof(struct serclt_info));
 	if( serclt == NULL){
 		return;
 	}
@@ -54,7 +64,10 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	}
 	LIST_WLOCK(sernet);
 	SimuList_Add(&sernet->serclt_list, fd, serclt, 0);
+	nlistlen = SimuList_Size(&sernet->serclt_list);
 	LIST_UNLOCK(sernet);
+
+	ERRSYS_INFOPRINT("sernet add fd:%d to list, cur listsize=%d!\n", fd, nlistlen);
 }
 
 void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
@@ -62,6 +75,7 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 	int socketfd = 0;
 	char disconnectflag = 0;
 	struct sernet_info *sernet = (struct sernet_info *)arg;
+	int nlistlen = 0;
 
 	socketfd = bufferevent_getfd(bev);
 	if( what & BEV_EVENT_READING && what & BEV_EVENT_WRITING){
@@ -71,6 +85,8 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 		disconnectflag = 1;
 	}
 	if( disconnectflag){
+		ERRSYS_INFOPRINT("sernet socket=%d disconnet\n", socketfd);
+		
 		SimuListNode_t *node = NULL;
 		struct serclt_info *serclt = NULL;
 		LIST_WLOCK(sernet);
@@ -80,7 +96,10 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 			serclt_release(serclt);
 			SimuList_Del(&sernet->serclt_list, socketfd, NULL);
 		}
+		nlistlen = SimuList_Size(&sernet->serclt_list);
 		LIST_UNLOCK(sernet);
+
+		ERRSYS_INFOPRINT("sernet del fd:%d from list, cur listsize=%d!\n", socketfd, nlistlen);
 	}
 }
 
@@ -134,14 +153,15 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct se
 	if(sernet->evbase == NULL){
 		goto err3;
 	}
-	sernet->evlistener = evconnlistener_new_bind(sernet->evbase,_sernet_acceptcb,sernet->evbase,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
+	sernet->evlistener = evconnlistener_new_bind(sernet->evbase,_sernet_acceptcb,sernet,LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE | LEV_OPT_THREADSAFE,  
                                       10, (struct sockaddr *)&serun,  size);  
 	if( sernet->evlistener == NULL){
 		goto err4;	
 	}
 	sernet->ser_op.transmitpacket = op->transmitpacket;
 	sernet->ser_op.param = op->param;
-	
+
+	ERRSYS_INFOPRINT("sernet init path:%s ok!!! \n", netpath);
 	return 0;
 err4:
 	event_base_free(sernet->evbase);
@@ -176,7 +196,7 @@ void sernet_release(struct sernet_info *sernet)
 	event_base_free(sernet->evbase);
 }
 
-int sernet_write(struct sernet_info *sernet, void *data, int len, int serid, int seqno)
+int sernet_write(struct sernet_info *sernet,int serid, int seqno,void *data, int len)
 {
 	SimuListNode_t *node = NULL;
 	struct serclt_info *serclt = NULL;

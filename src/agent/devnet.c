@@ -24,7 +24,7 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 {
 	struct devnet_info *devnet = ctx;
 	size_t nread, remain_len;
-	uint32_t sapce, space_to_end;
+	uint32_t space_to_end;
 	uint8_t *packet;
 	struct cmd_packet *packet_head;
 	int errorflag = 0;
@@ -59,11 +59,11 @@ void _devnet_readcb(struct bufferevent *bev, void *ctx)
 			if(pnode != NULL){
 				pmsg = (struct devnet_msg *)pnode->pData;
 				nserid = pmsg->nserid;
-				SimuList_Del(&devnet->msglist, packet_head->seqno);
+				SimuList_Del(&devnet->msglist, packet_head->seqno, NULL);
 			}
 			LIST_UNLOCK(devnet);
 			if(nserid > 0){
-				devnet->net_op.dealpacket(devnet->op_param, packet, packet_head->f.length, packet_head->seqno);
+				devnet->net_op.dealpacket(devnet->net_op.param, nserid, packet_head->seqno, packet, packet_head->f.length);
 			}else{
 				ERRSYS_INFOPRINT("[%s-%d] recv missing packet, seqno:%d, length:%d\n",devnet->ipaddr, devnet->usport, 
 					packet_head->seqno, packet_head->f.length);
@@ -135,6 +135,7 @@ void _devnet_msglistclear(SimuList_t *msglist)
 		msg = (struct devnet_msg *)p1->pData;
 		if(tnow - msg->reqtime > CMD_MAX_RESP_TIME_SEC){
 			p2->pNext = p1->pNext;
+			ERRSYS_WARNPRINT("Req Msg, seqno:%d, serid:%d, timeout!!!, not recv resp!!", msg->nseqno, msg->nserid);
 			free(msg);
 			free(p1);
 			msglist->nCount--;
@@ -146,12 +147,11 @@ void _devnet_msglistclear(SimuList_t *msglist)
 	}
 }
 
-int devnet_initialize(struct devnet_info *devnet,const char *ipaddr, int port, void* param, struct devnet_op *op)
+int devnet_initialize(struct devnet_info *devnet,const char *ipaddr, int port, struct devnet_op *op)
 {
 	int retval;
 	uint8_t *blob;
 
-	devnet->op_param = param;
 	if ((retval = pthread_rwlockattr_init(&(devnet->rwlock_attr))) < 0) {
 		ERRSYS_FATALPRINT("fail to initialize rwlock attribute for devnet: %s\n", strerror(errno));
 		goto err1;
@@ -179,6 +179,9 @@ int devnet_initialize(struct devnet_info *devnet,const char *ipaddr, int port, v
 	devnet->flags = DEVNET_FLAGS_DROPADDATA;	
 	strcpy(devnet->ipaddr, ipaddr);
 	devnet->usport = port;
+
+	devnet->net_op.dealpacket = op->dealpacket;
+	devnet->net_op.param = op->param;
 	
 	return 0;
 err4:
@@ -242,7 +245,7 @@ int devnet_isconnected(struct devnet_info *devnet)
 	return 0;
 }
 
-int devnet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno)
+int devnet_write(struct devnet_info *devnet,int serid, uint8_t seqno, void *data, int len)
 {
 	int retval = -1;
 	SimuListNode_t *pnode = NULL;
@@ -267,11 +270,12 @@ int devnet_write(struct devnet_info *devnet, void *data, int len, int serid, int
 	if (retval == -1) {
 		ERRSYS_ERRPRINT("fail to send data length %d\n", len);
 	}else{
-		pmsg = zmalloc(struct devnet_msg);
+		pmsg = zmalloc(sizeof(struct devnet_msg));
 		pmsg->nseqno = seqno;
 		pmsg->nserid = serid;
 		pmsg->reqtime = time(NULL);
 		SimuList_Add(&devnet->msglist, seqno, pmsg, 0);
+		printf("MsgList count:%d \n", devnet->msglist.nCount);
 	}
 	LIST_UNLOCK(devnet);
 	return retval;

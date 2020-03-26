@@ -3,15 +3,6 @@
 
 #include "serclient.h"
 
-#define SERNET_RDBUFFER_SIZE		   204800
-
-#define SERNET_FLAGS_DROPADDATA				0
-#define SERNET_FLAGS_RECEIVEALL				1
-#define SERNET_FLAGS_CONNECTED				2
-
-#define IS_SERNET_DROPADDATA(devnet)		((devnet)->flags & DEVNET_FLAGS_DROPADDATA)
-#define IS_SERNET_CONNECTED(devnet)			((devnet)->flags & DEVNET_FLAGS_CONNECTED)
-
 struct sernet_info{
 	char serpath[32];
 
@@ -26,12 +17,12 @@ struct sernet_info{
 	struct serclt_op ser_op;
 };
 
-int sernet_initialize(struct devnet_info *devnet, const char *netpath, struct serclt_op *op);
-void sernet_release(struct devnet_info *devnet);
+int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct serclt_op *op);
+void sernet_release(struct sernet_info *sernet);
 
-int sernet_write(struct devnet_info *devnet, void *data, int len, int serid, int seqno);
-void sernet_loop(struct devnet_info *devnet);
-void sernet_breakloop(struct devnet_info *devnet);
+int sernet_write(struct sernet_info *sernet,int serid, int seqno, void *data, int len);
+void sernet_loop(struct sernet_info *sernet);
+void sernet_breakloop(struct sernet_info *sernet);
 
 #endif
 

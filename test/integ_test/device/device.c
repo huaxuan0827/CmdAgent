@@ -59,16 +59,25 @@ int main(int argc, char** argv)
         }
         while((nread= read(connfd,readBuf,MAXBUFFER)))//读客户端发送的数据
         {
-        	//sleep(1);
+        	sleep(1);
 			static int nCount = 0;
 			nCount++;
-			/*if( nCount% 5 == 0){
+
+#if 0
+			if( nCount% 30 == 0){
 				for( unsigned i = 0; i < nread; i++){
 					readBuf[i] = 0xFF;
 				}
-			}*/
-            write(connfd,readBuf,nread);//写回客户端
-            //printf("ncount:%d, read:%d \n",nCount, nread);
+			}
+			if( nCount % 20 != 0){
+           		write(connfd,readBuf,nread);//写回客户端
+			}else{
+				printf("recv len:%d but not resp! \n", nread);
+			}
+#else
+			write(connfd,readBuf,nread);//写回客户端
+#endif
+            printf("ncount:%d, read:%d \n",nCount, nread);
             bzero(readBuf,MAXBUFFER);
         }
 
