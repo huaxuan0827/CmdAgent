@@ -140,7 +140,7 @@ int cmdagnet_initconfig(struct cmdagent_info *agent)
 
 	evthread_use_pthreads();//enable threads 
 	
-	agent->dev_num = 1;
+	agent->dev_num = 2;
 	for(idx = 0; idx < agent->dev_num; idx++){
 		strcpy(agent->dev_info[idx].ipaddr, "192.168.245.128");
 		agent->dev_info[idx].usport = usport+idx;
@@ -263,7 +263,7 @@ int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short uspo
 		
 	nret = devcom_write(devproc,serid,seqno,data, len);
 	if( nret < 0){
-		ERRSYS_WARNPRINT("serid:%d, seqno:%d, datalen:%d, write data to dev ip=%s, port=%d\n",serid,seqno,len,szdevip,usport);
+		ERRSYS_ERRPRINT("serid:%d, seqno:%d, datalen:%d, write data to dev ip=%s, port=%d failed!!!\n",serid,seqno,len,szdevip,usport);
 	}
 	return 0;
 }

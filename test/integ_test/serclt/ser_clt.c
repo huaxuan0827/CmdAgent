@@ -20,13 +20,21 @@ struct agent_req{
 }__attribute__((packed));
 
 
-int main() {  
+int main(int argc, char** argv) {  
     struct  sockaddr_un cliun, serun;  
     int len;  
     char buf[100];  
 	char buf2[100];  
     int sockfd, n;  
- 
+	unsigned short usport;
+	
+	if( argc != 2){
+		printf("argc != 2, please input port!");
+		return -1;
+	}
+
+	usport = atoi(argv[1]);
+	
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0){  
         perror("client socket error");  
         exit(1);  
@@ -65,19 +73,19 @@ int main() {
 		 req->agent_head.devip[1] = 168;
 		 req->agent_head.devip[2] = 245;
 		 req->agent_head.devip[3] = 128;
-		 req->agent_head.port = 9900;
+		 req->agent_head.port = usport;
 		 req->cmd_head.seqno = seqno++;
 		 req->cmd_head.f.length = 8 + 12;
 		 req->cmd_head.cmd = 0x12;
 		 
          write(sockfd, buf, req->cmd_head.f.length + AGENT_PACKET_HEAD_LEN);  
-		 printf("send data seqno:%d \n", req->cmd_head.seqno);
+		 printf("send data seqno:%d, usport:%d \n", req->cmd_head.seqno, usport);
 		 
 		 sleep(1);
 		 
          n = read(sockfd, buf2, MAXLINE);  
 		 resp = (struct cmd_packet*)buf2;
-		 printf("recv data n=%d, cmd:%d,seqno:%d \n", n,resp->cmd, resp->seqno);
+		 printf("recv data n=%d, cmd:%d, seqno:%d \n", n,resp->cmd, resp->seqno);
              
     }   
     close(sockfd);  
