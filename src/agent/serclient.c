@@ -25,6 +25,8 @@ int serclt_initialize(struct serclt_info *serclt, struct serclt_op *op)
 	serclt->wr_off = 0;
 	serclt->rd_off = 0;
 	serclt->error_count = 0;
+
+	serclt->devport = 0;
 	
 	serclt->net_op.param = op->param;
 	serclt->net_op.transmitpacket = op->transmitpacket;
@@ -41,12 +43,11 @@ void serclt_release(struct serclt_info *serclt)
 int serclt_recvdata(struct serclt_info *serclt)
 {
 	size_t nread, remain_len;
-	uint32_t sapce, space_to_end;
+	uint32_t space_to_end;
 	uint8_t *packet;
 	struct agent_packet *agent_head;
 	struct cmd_packet *cmd_head;
 	int errorflag = 0;
-	char ipaddr[32] = {0};
 	
 	space_to_end = SERCLT_RDBUFFER_SIZE - serclt->wr_off;
 	nread = bufferevent_read(serclt->evbuffer, serclt->data_blob + serclt->wr_off, space_to_end);
@@ -54,47 +55,37 @@ int serclt_recvdata(struct serclt_info *serclt)
 		serclt->wr_off += nread;
 	}
 
-	while( serclt->wr_off - serclt->rd_off > CMD_PACKET_HEAD_LEN + AGENT_PACKET_HEAD_LEN){
+	while( serclt->wr_off - serclt->rd_off >= CMD_PACKET_HEAD_LEN){
 		packet = serclt->data_blob + serclt->rd_off;
-		agent_head = (struct agent_packet *)packet;
-		cmd_head = (struct cmd_packet*)(packet + AGENT_PACKET_HEAD_LEN);
-		remain_len = serclt->wr_off - AGENT_PACKET_HEAD_LEN - serclt->rd_off;
+		cmd_head = (struct cmd_packet*)(packet);
 
-		sprintf(ipaddr, "%u.%u.%u.%u", agent_head->devip[0], agent_head->devip[1], agent_head->devip[2], agent_head->devip[3]);
-		if( cmd_head->f.length >= CMD_PACKET_MAX_LENGTH || cmd_head->f.length < CMD_PACKET_HEAD_LEN){
-			errorflag = 1;
-			ERRSYS_INFOPRINT("recv error packet length:%d , devip:%s\n",cmd_head->f.length, ipaddr);
+		if(serclt->devport <= 0 && cmd_head->magic == AGENT_INIT_PACKET_HEAD_MAGIC){
+			agent_head = (struct agent_packet *)(packet);
+			sprintf(serclt->devip, "%u.%u.%u.%u", agent_head->devip[0], agent_head->devip[1], agent_head->devip[2], agent_head->devip[3]);
+			serclt->devport = agent_head->port;
+			serclt->rd_off += AGENT_PACKET_HEAD_LEN;
+			ERRSYS_INFOPRINT("serclt:%d, register devip:%s, port:%d \n", serclt->nsocket, serclt->devip, serclt->devport);
+			continue;
+		}
+		
+		if( serclt->devport <= 0){
+			ERRSYS_INFOPRINT("serclt:%d, not register devip port, but recv cmd:%d, seqno:%d, len:%d, refuse agent!!\n", 
+				serclt->nsocket, cmd_head->cmd, cmd_head->seqno, serclt->wr_off- serclt->rd_off);
+			serclt->error_count++;
+
+			serclt->wr_off = 0;
+			serclt->rd_off = 0;	
 			break;
 		}
-		if( cmd_head->f.length > remain_len){
-			break;
-		}
+
+		remain_len = serclt->wr_off- serclt->rd_off;
+		packet = serclt->data_blob + serclt->rd_off;
 		if( serclt->net_op.transmitpacket != NULL){
-			serclt->net_op.transmitpacket(serclt->net_op.param, ipaddr, agent_head->port, serclt->nsocket, cmd_head->seqno,packet + AGENT_PACKET_HEAD_LEN,cmd_head->f.length);
+			serclt->net_op.transmitpacket(serclt->net_op.param,serclt->devip,serclt->devport,serclt->nsocket, packet, remain_len);
 		}
-		serclt->rd_off += AGENT_PACKET_HEAD_LEN;
-		serclt->rd_off += cmd_head->f.length;
-	}
-
-	if(errorflag){
-		// reset buffer!
-		ERRSYS_INFOPRINT("[%d] recv data error, now will reset, wr_off:%d, rd_off:%d !\n", serclt->nsocket,
-			serclt->wr_off, serclt->rd_off);
-		evbuffer_drain(bufferevent_get_input(serclt->evbuffer), -1);
 		serclt->wr_off = 0;
-		serclt->rd_off = 0;
-		serclt->error_count++;	
-		errorflag = 0;
+		serclt->rd_off = 0;	
 	}
-
-	space_to_end = SERCLT_RDBUFFER_SIZE - serclt->wr_off;
-	if( space_to_end < CMD_PACKET_MAX_LENGTH){
-		ERRSYS_INFOPRINT("[%d] wr_off:%d, rd_off:%d, sapce_to_end:%d\n", serclt->nsocket,
-			serclt->wr_off, serclt->rd_off, space_to_end);
-		memmove(serclt->data_blob, serclt->data_blob + serclt->rd_off, serclt->wr_off - serclt->rd_off);
-		serclt->rd_off = 0;
-		serclt->wr_off = serclt->wr_off - serclt->rd_off;
-	}	
 }
 
 int serclt_writedata(struct serclt_info *serclt, void *data, int len)

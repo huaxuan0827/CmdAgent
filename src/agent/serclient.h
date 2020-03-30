@@ -10,8 +10,8 @@ struct serclt_op{
 	//callback functions
 	void *param;
 
-	//void *param, const char *szdevip, unsigned short usport, int serid, int seqno, void *data, int len
-	int (*transmitpacket)(void *,const char *, unsigned short, int, int,void *,int);
+	//void *param, const char *szdevip, unsigned short usport, int serid, void *data, int len
+	int (*transmitpacket)(void *,const char *, unsigned short, int, void *,int);
 };
 
 struct serclt_msg{
@@ -24,6 +24,9 @@ struct serclt_info{
 	int nsocket;
 	char netpath[32];
 	struct bufferevent *evbuffer;
+
+	char devip[32];
+	unsigned short devport;
 
 	uint8_t *data_blob;
 	uint32_t rd_off;

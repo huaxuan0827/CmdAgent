@@ -17,6 +17,6 @@ struct devcom_proc{
 int devcom_initialize(struct process_info *proc);
 void devcom_release(struct process_info *proc);
 
-int devcom_write(struct devcom_proc *devproc,int serid, uint8_t seqno, void *data, int len);
+int devcom_write(struct devcom_proc *devproc,int serid,void *data, int len);
 
 #endif

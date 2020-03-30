@@ -101,6 +101,8 @@ struct l0006_netcom_info {
 void l0006_netcom_release(struct l0006_netcom_info *nc);
 int l0006_netcom_initialize(struct l0006_netcom_info *nc, void* parent, struct l0006_netcom_operation *ncop, uint32_t timeout_ms);
 int l0006_netcom_connect(struct l0006_netcom_info *nc, const char *url, int port);
+int l0006_netcom_connect2(struct l0006_netcom_info *nc, const char *serpath);
+
 void l0006_netcom_disconnect(struct l0006_netcom_info *nc);
 int l0006_netcom_write(struct l0006_netcom_info *nc, void *data, int len, struct l0006_netcom_action *ncaction, int ack);
 void l0006_netcom_loop(struct l0006_netcom_info *nc);

@@ -522,6 +522,44 @@ err1:
 	return retval;
 }
 
+int l0006_netcom_connect2(struct l0006_netcom_info *nc, const char *serpath)
+{
+	int retval = -1;
+	struct  sockaddr_un serun; 
+	int nlen = 0;
+	
+	LIST_WLOCK(nc);
+	if (nc->bev) {
+		bufferevent_free(nc->bev);
+		nc->bev = NULL;
+	}
+	nc->bev = bufferevent_socket_new(nc->base, -1, BEV_OPT_CLOSE_ON_FREE);
+	if (nc->bev == NULL) {
+		goto err1;
+	}
+	ERRSYS_INFOPRINT("netcom connect %s\n", serpath);
+
+	memset(&serun, 0, sizeof(serun));  
+    serun.sun_family = AF_UNIX;  
+    strcpy(serun.sun_path, serpath);  
+    nlen = offsetof(struct sockaddr_un, sun_path) + strlen(serun.sun_path);  
+    if (bufferevent_socket_connect(nc->bev, (struct sockaddr *)&serun, nlen) < 0){  
+       ERRSYS_ERRPRINT("Fail to connect %s\n", serpath);
+		goto err2;
+    }  
+	bufferevent_setcb(nc->bev, netcom_readcb, NULL, netcom_eventcb, nc);
+	bufferevent_enable(nc->bev, EV_READ | EV_WRITE | EV_PERSIST);
+	LIST_UNLOCK(nc);
+
+	return 0;
+err2:
+	bufferevent_free(nc->bev);
+	nc->bev = NULL;
+err1:
+	LIST_UNLOCK(nc);
+	return retval;	
+}
+
 void l0006_netcom_disconnect(struct l0006_netcom_info *nc)
 {
 	if (nc->base) {

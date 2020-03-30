@@ -42,7 +42,7 @@ struct cmdagent_info {
 	uint32_t dev_num;
 };
 
-int cmdagent_sendto_device(void *param,const char *szdevip, unsigned short usport, int serid, int seqno, void *data, int len);
+int cmdagent_sendto_device(void *param,const char *szdevip, unsigned short usport, int serid, void *data, int len);
 
 int signal_initialize(struct cmdagent_info *agent_info);
 void cmdagent_exit(struct cmdagent_info *agent_info) ;

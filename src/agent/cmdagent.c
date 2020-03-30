@@ -239,7 +239,7 @@ err1:
 	return 0;
 }
 
-int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short usport, int serid, int seqno, void *data, int len)
+int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short usport, int serid, void *data, int len)
 {
 	if( szdevip == NULL || usport == 0 || data == 0){
 		return -1;
@@ -261,9 +261,9 @@ int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short uspo
 	}
 	devproc = (struct devcom_proc *)agent->dev_info[idx].devproc;
 		
-	nret = devcom_write(devproc,serid,seqno,data, len);
+	nret = devcom_write(devproc,serid,data, len);
 	if( nret < 0){
-		ERRSYS_ERRPRINT("serid:%d, seqno:%d, datalen:%d, write data to dev ip=%s, port=%d failed!!!\n",serid,seqno,len,szdevip,usport);
+		ERRSYS_ERRPRINT("serid:%d,datalen:%d, write data to dev ip=%s, port=%d failed!!!\n",serid,len,szdevip,usport);
 	}
 	return 0;
 }

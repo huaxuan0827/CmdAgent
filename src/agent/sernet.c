@@ -42,7 +42,7 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	struct sockaddr_un *sunaddr = NULL;
 
 	sunaddr = (struct sockaddr_un *)address;
-	ERRSYS_INFOPRINT("sernet recv new clt fd:%d, netpath:%s\n", fd, sunaddr->sun_path);
+	ERRSYS_INFOPRINT("sernet recv new clt fd:%d \n", fd);
 	
 	struct bufferevent* newbuffer = bufferevent_socket_new(sernet->evbase, fd, BEV_OPT_CLOSE_ON_FREE);
 	if( newbuffer == NULL){
@@ -78,9 +78,9 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 	int nlistlen = 0;
 
 	socketfd = bufferevent_getfd(bev);
-	if( what & BEV_EVENT_READING && what & BEV_EVENT_WRITING){
+	/*if( what & BEV_EVENT_READING && what & BEV_EVENT_WRITING){
 		disconnectflag = 1;
-	}
+	}*/
 	if( what & BEV_EVENT_EOF || what & BEV_EVENT_ERROR){
 		disconnectflag = 1;
 	}
@@ -196,7 +196,7 @@ void sernet_release(struct sernet_info *sernet)
 	event_base_free(sernet->evbase);
 }
 
-int sernet_write(struct sernet_info *sernet,int serid, int seqno,void *data, int len)
+int sernet_write(struct sernet_info *sernet,int serid, void *data, int len)
 {
 	SimuListNode_t *node = NULL;
 	struct serclt_info *serclt = NULL;
@@ -208,7 +208,7 @@ int sernet_write(struct sernet_info *sernet,int serid, int seqno,void *data, int
 		serclt = (struct serclt_info *)node->pData;
 		nret = serclt_writedata(serclt, data, len);
 	}else{
-		ERRSYS_WARNPRINT("sernet write, serid:%d, seqno:%d, len:%d, but serclt is disconnect!");
+		ERRSYS_WARNPRINT("sernet write, serid:%d, len:%d, but serclt is disconnect! \n", serid, len);
 	}
 	LIST_UNLOCK(sernet);
 	return nret;

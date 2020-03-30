@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define AGENT_PACKET_HEAD_MAGIC 0xFCFC
+#define AGENT_INIT_PACKET_HEAD_MAGIC 0xFCFA
 struct agent_packet{
 	uint16_t magic;
 	uint8_t devip[4];
@@ -12,6 +12,7 @@ struct agent_packet{
 
 #define AGENT_PACKET_HEAD_LEN sizeof(struct agent_packet)
 
+#define AGENT_CMD_PACKET_HEAD_MAGIC 0xBEEF
 struct cmd_packet{
 	uint16_t magic;
 	uint8_t cmd;

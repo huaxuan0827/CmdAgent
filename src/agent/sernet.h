@@ -20,7 +20,7 @@ struct sernet_info{
 int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct serclt_op *op);
 void sernet_release(struct sernet_info *sernet);
 
-int sernet_write(struct sernet_info *sernet,int serid, int seqno, void *data, int len);
+int sernet_write(struct sernet_info *sernet,int serid,void *data, int len);
 void sernet_loop(struct sernet_info *sernet);
 void sernet_breakloop(struct sernet_info *sernet);
 

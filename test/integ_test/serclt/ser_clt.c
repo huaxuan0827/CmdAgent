@@ -40,7 +40,8 @@ int main(int argc, char** argv) {
         exit(1);  
     }  
       
-    // 一般显式调用bind函数，以便服务器区分不同客户端  
+#if 0
+	// 一般显式调用bind函数，以便服务器区分不同客户端  
     memset(&cliun, 0, sizeof(cliun));  
     cliun.sun_family = AF_UNIX;  
     strcpy(cliun.sun_path, client_path);  
@@ -50,6 +51,7 @@ int main(int argc, char** argv) {
         perror("bind error");  
         exit(1);  
     }  
+ #endif
  
     memset(&serun, 0, sizeof(serun));  
     serun.sun_family = AF_UNIX;  
