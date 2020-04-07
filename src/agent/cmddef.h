@@ -8,6 +8,7 @@ struct agent_packet{
 	uint16_t magic;
 	uint8_t devip[4];
 	uint16_t port;
+	uint8_t cltid;
 }__attribute__((packed));
 
 #define AGENT_PACKET_HEAD_LEN sizeof(struct agent_packet)

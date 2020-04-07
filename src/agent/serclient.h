@@ -10,6 +10,8 @@ struct serclt_op{
 	//callback functions
 	void *param;
 
+	//void *param, const char *szdevip, unsigned short usport
+	int (*registerdevice)(void*,const char *, unsigned short);
 	//void *param, const char *szdevip, unsigned short usport, int serid, void *data, int len
 	int (*transmitpacket)(void *,const char *, unsigned short, int, void *,int);
 };
@@ -27,6 +29,7 @@ struct serclt_info{
 
 	char devip[32];
 	unsigned short devport;
+	uint8_t cltid;
 
 	uint8_t *data_blob;
 	uint32_t rd_off;

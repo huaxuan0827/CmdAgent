@@ -42,7 +42,7 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	struct sockaddr_un *sunaddr = NULL;
 
 	sunaddr = (struct sockaddr_un *)address;
-	ERRSYS_INFOPRINT("sernet recv new clt fd:%d \n", fd);
+	ERRSYS_INFOPRINT("SERNET recv new clt fd:%d \n", fd);
 	
 	struct bufferevent* newbuffer = bufferevent_socket_new(sernet->evbase, fd, BEV_OPT_CLOSE_ON_FREE);
 	if( newbuffer == NULL){
@@ -62,12 +62,13 @@ void _sernet_acceptcb(struct evconnlistener* listener, evutil_socket_t fd, struc
 	if( serclt_initialize(serclt,&sernet->ser_op) != 0){
 		return;
 	}
+	
 	LIST_WLOCK(sernet);
 	SimuList_Add(&sernet->serclt_list, fd, serclt, 0);
 	nlistlen = SimuList_Size(&sernet->serclt_list);
 	LIST_UNLOCK(sernet);
 
-	ERRSYS_INFOPRINT("sernet add fd:%d to list, cur listsize=%d!\n", fd, nlistlen);
+	ERRSYS_INFOPRINT("SERNET add fd:%d to list, cur listsize=%d!\n", fd, nlistlen);
 }
 
 void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
@@ -85,7 +86,7 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 		disconnectflag = 1;
 	}
 	if( disconnectflag){
-		ERRSYS_INFOPRINT("sernet socket=%d disconnet\n", socketfd);
+		ERRSYS_INFOPRINT("SERNET socket=%d disconnet\n", socketfd);
 		
 		SimuListNode_t *node = NULL;
 		struct serclt_info *serclt = NULL;
@@ -99,7 +100,7 @@ void _sernet_eventcb(struct bufferevent* bev, short what, void* arg)
 		nlistlen = SimuList_Size(&sernet->serclt_list);
 		LIST_UNLOCK(sernet);
 
-		ERRSYS_INFOPRINT("sernet del fd:%d from list, cur listsize=%d!\n", socketfd, nlistlen);
+		ERRSYS_INFOPRINT("SERNET del fd:%d from list, cur listsize=%d!\n", socketfd, nlistlen);
 	}
 }
 
@@ -120,10 +121,10 @@ void _sernet_readcb(struct bufferevent* bev,void* arg)
 		if( serclt->evbuffer == bev){
 			serclt_recvdata(serclt);
 		}else{
-			ERRSYS_WARNPRINT("sernet_readcb bev:%p != serclt->bev:%p \n", bev, serclt->evbuffer);
+			ERRSYS_WARNPRINT("SERNET sernet_readcb bev:%p != serclt->bev:%p \n", bev, serclt->evbuffer);
 		}
 	}else{
-		ERRSYS_WARNPRINT("sernet_readcb socket:%d, but not find in cltlist!\n", socketfd);
+		ERRSYS_WARNPRINT("SERNET sernet_readcb socket:%d, but not find in cltlist!\n", socketfd);
 	}
 }
 
@@ -135,11 +136,11 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct se
 
 	SimuList_Create(&sernet->serclt_list);	
 	if(pthread_rwlockattr_init(&sernet->rwlock_attr) < 0) {
-		ERRSYS_FATALPRINT("fail to initialize rwlock attribute for devnet: %s\n", strerror(errno));
+		ERRSYS_FATALPRINT("SERNET fail to initialize rwlock attribute for devnet: %s\n", strerror(errno));
 		goto err1;
 	}
 	if(pthread_rwlock_init(&sernet->rwlock,&sernet->rwlock_attr) < 0) {
-		ERRSYS_FATALPRINT("fail to initialize rwlock for devnet: %s\n", strerror(errno));
+		ERRSYS_FATALPRINT("SERNET fail to initialize rwlock for devnet: %s\n", strerror(errno));
 		goto err2;
 	}
 	
@@ -161,7 +162,7 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct se
 	sernet->ser_op.transmitpacket = op->transmitpacket;
 	sernet->ser_op.param = op->param;
 
-	ERRSYS_INFOPRINT("sernet init path:%s ok!!! \n", netpath);
+	ERRSYS_INFOPRINT("SERNET init path:%s ok!!! \n", netpath);
 	return 0;
 err4:
 	event_base_free(sernet->evbase);
@@ -208,7 +209,7 @@ int sernet_write(struct sernet_info *sernet,int serid, void *data, int len)
 		serclt = (struct serclt_info *)node->pData;
 		nret = serclt_writedata(serclt, data, len);
 	}else{
-		ERRSYS_WARNPRINT("sernet write, serid:%d, len:%d, but serclt is disconnect! \n", serid, len);
+		ERRSYS_WARNPRINT("SERNET write, serid:%d, len:%d, but serclt is disconnect! \n", serid, len);
 	}
 	LIST_UNLOCK(sernet);
 	return nret;

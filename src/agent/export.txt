@@ -6,15 +6,15 @@ TYPE=APP
 # headers, libs, directories need exporting
 #EXPORT_HEADER=""
 #EXPORT_LIB=""
-EXPORT_APP="a0018-0"
+EXPORT_APP="a0015-0"
 #EXPORT_MOD
 #EXPORT_SCRIPT
 
-EXPORT_CONFIG="a0018-0.ini"
+EXPORT_CONFIG=
 
 # compilation flags:
-CFLAGS="-I./ -I./include -DUSE_L0017_SHMFIFO_SENSOR -DUSE_DXTABLE -DUSE_DXTABLE_MONI"
-LIBS="-ll0001-0 -ll0002-0 -ll0003-0 -ll0005-0 -ll0006-0 -ll0007-0 -ll0008-0 -ll0017-0 -lpthread -lm -lrt -lanl -lcurl -levent -levent_pthreads"
+CFLAGS="-I./ -I./include"
+LIBS="-ll0001-0 -ll0002-0 -ll0003-0 -ll0007-0 -ll0017-0 -lpthread -lm -lrt -lanl -lcurl -levent -levent_pthreads"
 #CFLAGS_OVERRIDE
 #LIBS_OVERRIDE
 #NAME_OVERRIDE

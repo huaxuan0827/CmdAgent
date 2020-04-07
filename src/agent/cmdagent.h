@@ -16,7 +16,8 @@
 #define CMDAGENT_TASK_NAME_SERVICE		"service"
 #define CMDAGENT_TASK_NAME_DEVICE		"device_%d"
 
-#define CMDAGENT_MAX_DEV_NUM 			16
+#define CMDAGENT_MAX_DEV_NUM 			32
+#define CMDAGENT_DEV_PORT_DEF			7777
 
 struct deventity_info {
 	char ipaddr[32];
@@ -28,24 +29,17 @@ struct deventity_info {
 	void *devproc;
 };
 
-struct cmdagent_info {
-	//struct l0017_shmstruct* shm_struct;
-	//void *global_config;
-
-	//char dxt_cfgfile[L0017_DXT_PATH_MAX_LEN];
-	//struct l0017_dxt_appconf *dxt_conf;
-	//struct l0017_app_dxtinfo *dxt_info;
-		
+struct cmdagent_info {		
 	struct tasks_cluster *tcluster;
 	struct deventity_info dev_info[CMDAGENT_MAX_DEV_NUM];
-	uint32_t dev_bmp;
 	uint32_t dev_num;
 };
 
+int cmdagent_register_device(void *param, const char *szdevip, unsigned short usport);
 int cmdagent_sendto_device(void *param,const char *szdevip, unsigned short usport, int serid, void *data, int len);
-
 int signal_initialize(struct cmdagent_info *agent_info);
-void cmdagent_exit(struct cmdagent_info *agent_info) ;
+void cmdagent_exit(struct cmdagent_info *agent_info);
+
 
 #endif
 

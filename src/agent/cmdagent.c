@@ -135,6 +135,7 @@ int cmdagent_uninitdxt(struct cmdagent_info *agent)
 
 int cmdagnet_initconfig(struct cmdagent_info *agent)
 {
+#if 0
 	int idx = 0;
 	unsigned short usport = 9900;
 
@@ -146,6 +147,9 @@ int cmdagnet_initconfig(struct cmdagent_info *agent)
 		agent->dev_info[idx].usport = usport+idx;
 		agent->dev_info[idx].rack_index = idx;
 	}
+#else
+	agent->dev_num = 0;
+#endif
 	return 0;
 }
 
@@ -239,6 +243,54 @@ err1:
 	return 0;
 }
 
+int cmdagent_register_device(void *param, const char *szdevip, unsigned short usport)
+{
+	if( szdevip == NULL || usport == 0){
+		return -1;
+	}
+	int idx = 0, nret = -1, bfind = 0, taskindex = 0;
+	struct cmdagent_info *agent = (struct cmdagent_info *)param;
+	struct tasks_cluster *tcluster = agent->tcluster;
+	struct task_info *task = tcluster->task;
+
+
+	for( idx = 0; idx < agent->dev_num; idx++){
+		if( strcmp(szdevip, agent->dev_info[idx].ipaddr) == 0 && usport == agent->dev_info[idx].usport){
+			bfind = 1;
+			break;
+		}
+	}
+	if( bfind){
+		ERRSYS_WARNPRINT("CMDAGENT add device ip=%s, port=%d, but this device is create!!!\n", szdevip, usport);
+		return 0;
+	}
+
+	idx = agent->dev_num;
+	if( idx >= CMDAGENT_MAX_DEV_NUM ){
+		ERRSYS_WARNPRINT("CMDAGENT add device ip=%s, port=%d, but device list is full, size=%d !!!\n", szdevip, usport, agent->dev_num);
+		return -1;
+	}
+
+	taskindex = CMDAGENT_TASK_DEVICE + idx;
+	sprintf(agent->dev_info[idx].taskname, CMDAGENT_TASK_NAME_DEVICE, idx);
+	agent->dev_info[idx].taskindex = taskindex;
+	task_instantiate2(agent->tcluster, agent->dev_info[idx].taskindex, agent->dev_info[idx].taskname, 0, 
+			devcom_initialize, devcom_release,idx);
+	
+	if( task[taskindex].initialize != NULL) {
+		if (task[taskindex].initialize(tcluster, taskindex) < 0) {
+			ERRSYS_FATALPRINT("CMDAGENT Fail to initialize task #%d, device ip=%s, port=%d\n", taskindex, szdevip, usport);
+			return -1;
+		}
+	}
+	
+	if( task[taskindex].startup(&task[taskindex])){
+		ERRSYS_FATALPRINT("CMDAGENT Fail to startup task #%d, device ip=%s, port=%d\n", taskindex, szdevip, usport);
+		return -1;
+	}
+	return 0;
+}
+
 int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short usport, int serid, void *data, int len)
 {
 	if( szdevip == NULL || usport == 0 || data == 0){
@@ -256,14 +308,14 @@ int cmdagent_sendto_device(void *param, const char *szdevip, unsigned short uspo
 		}
 	}
 	if( !bfind){
-		ERRSYS_WARNPRINT("not find dev ip=%s, port=%d\n", szdevip, usport);
+		ERRSYS_WARNPRINT("CMDAGENT not find dev ip=%s, port=%d\n", szdevip, usport);
 		return -1;
 	}
 	devproc = (struct devcom_proc *)agent->dev_info[idx].devproc;
 		
 	nret = devcom_write(devproc,serid,data, len);
 	if( nret < 0){
-		ERRSYS_ERRPRINT("serid:%d,datalen:%d, write data to dev ip=%s, port=%d failed!!!\n",serid,len,szdevip,usport);
+		ERRSYS_ERRPRINT("CMDAGENT serid:%d,datalen:%d, write data to dev ip=%s, port=%d failed!!!\n",serid,len,szdevip,usport);
 	}
 	return 0;
 }

@@ -15,9 +15,9 @@
 {	int retval = -1;	struct tasks_cluster *tcluster = (struct tasks_cluster*)proc->root;	struct sercom_proc *ser_proc;
 	struct cmdagent_info *agent_info;	struct serclt_op ser_op;	agent_info = (struct cmdagent_info *)tcluster->parent;	
 		ser_proc = (struct sercom_proc*)zmalloc(sizeof(struct sercom_proc));	if (ser_proc == NULL) {
-		ERRSYS_FATALPRINT("Fail to allocate sercom task\n");
+		ERRSYS_FATALPRINT("SERCOM Fail to allocate sercom task\n");
 		goto err1;	}		proc->priv = (void *)ser_proc;
-
+	ser_op.registerdevice = cmdagent_register_device;
 	ser_op.transmitpacket = cmdagent_sendto_device;
 	ser_op.param = proc->init_param;
 	
@@ -25,6 +25,6 @@
 		goto err1;	}
 	task_set_statmach(proc->parent, TASK_PREP, sercom_prep);
 	task_set_statmach(proc->parent, TASK_RUNNING, sercom_run);
-	ERRSYS_INFOPRINT("sercom process initialized.\n");
+	ERRSYS_INFOPRINT("SERCOM process initialized.\n");
 	return 0;err1:	return retval;}void sercom_release(struct process_info *proc)
 {	struct tasks_cluster *tcluster = (struct tasks_cluster*)proc->root;	struct sercom_proc *ser_proc = (struct sercom_proc*)proc->priv;	struct task_info *ser_task = GET_TASK(tcluster, CMDAGENT_TASK_SERVICE);	sernet_breakloop(&ser_proc->ser_net);	sernet_release(&ser_proc->ser_net);}int sercom_write(struct sercom_proc *serproc,int serid,void *data, int len){	if( serproc == NULL || data == NULL){		return -1;	}	return sernet_write(&serproc->ser_net,serid, data, len);}

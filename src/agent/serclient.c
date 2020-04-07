@@ -16,6 +16,59 @@
 
 #define MODNAME	 "[A15SC]"
 
+void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int flag)
+{
+	int i;
+	static FILE* fp = NULL;
+	static int nCount = 0;
+	struct tm *tmp_ptr = NULL;
+	time_t tnow;
+	char time_str[256];
+	
+ 	time(&tnow);
+ 	tmp_ptr = gmtime(&tnow);
+	sprintf(time_str, "%02d%02d_%02d%02d%02d",tmp_ptr->tm_mon, 
+			tmp_ptr->tm_mday, 
+			tmp_ptr->tm_hour, 
+			tmp_ptr->tm_min,
+			tmp_ptr->tm_sec);
+  
+	if( fp == NULL || nCount > 10*1024*1024){
+		if( fp != NULL){
+			fclose(fp);
+			fp = NULL;
+		}
+		char szFileName[256] = {0};
+
+		mkdir("/tmp/log_dump",0755);
+		sprintf(szFileName, "/tmp/log_dump/agentdata_dump_%s",time_str);
+		printf("szFileName:%s \n", szFileName);
+		fp = fopen(szFileName, "w");
+		nCount = 0;
+	}
+	if( fp == NULL){
+		printf("fp == NULL \n");
+		return;
+	}
+
+	if( flag == 1)
+		fprintf(fp, "[%s] size=%d, clt:%d-socket:%d => dev:%s-port:%d\n", time_str, size, serclt->cltid, serclt->nsocket, serclt->devip, serclt->devport);
+	else
+		fprintf(fp, "[%s] size=%d, dev:%s-port:%d => clt:%d-socket:%d\n", time_str, size, serclt->devip, serclt->devport, serclt->cltid, serclt->nsocket);
+	nCount += size;
+	
+	for (i = 0;i < size;i++){
+		fprintf(fp, "%02x ", proto[i]);
+		if ((i & 0xF) == 0xF) {
+			fprintf(fp,"\n");
+		}
+	}
+	fprintf(fp, "\n");
+	fflush(fp);
+}
+
+
+
 int serclt_initialize(struct serclt_info *serclt, struct serclt_op *op)
 {
 	serclt->data_blob = zmalloc(SERCLT_RDBUFFER_SIZE);
@@ -48,6 +101,7 @@ int serclt_recvdata(struct serclt_info *serclt)
 	struct agent_packet *agent_head;
 	struct cmd_packet *cmd_head;
 	int errorflag = 0;
+	int nret = -1;
 	
 	space_to_end = SERCLT_RDBUFFER_SIZE - serclt->wr_off;
 	nread = bufferevent_read(serclt->evbuffer, serclt->data_blob + serclt->wr_off, space_to_end);
@@ -59,18 +113,24 @@ int serclt_recvdata(struct serclt_info *serclt)
 		packet = serclt->data_blob + serclt->rd_off;
 		cmd_head = (struct cmd_packet*)(packet);
 
-		if(serclt->devport <= 0 && cmd_head->magic == AGENT_INIT_PACKET_HEAD_MAGIC){
+		if(/*serclt->devport <= 0 && */cmd_head->magic == AGENT_INIT_PACKET_HEAD_MAGIC){
 			agent_head = (struct agent_packet *)(packet);
 			sprintf(serclt->devip, "%u.%u.%u.%u", agent_head->devip[0], agent_head->devip[1], agent_head->devip[2], agent_head->devip[3]);
 			serclt->devport = agent_head->port;
+			serclt->cltid = agent_head->cltid;
 			serclt->rd_off += AGENT_PACKET_HEAD_LEN;
-			ERRSYS_INFOPRINT("serclt:%d, register devip:%s, port:%d \n", serclt->nsocket, serclt->devip, serclt->devport);
+			
+			if( serclt->net_op.registerdevice != NULL){
+				nret = serclt->net_op.registerdevice(serclt->net_op.param, serclt->devip, serclt->devport);
+				ERRSYS_INFOPRINT("SERCLT=>clt:%d-socket:%d, register devip:%s, port:%d, nret:%d\n",serclt->cltid, serclt->nsocket, serclt->devip, 
+						serclt->devport, nret);
+			}
 			continue;
 		}
 		
 		if( serclt->devport <= 0){
-			ERRSYS_INFOPRINT("serclt:%d, not register devip port, but recv cmd:%d, seqno:%d, len:%d, refuse agent!!\n", 
-				serclt->nsocket, cmd_head->cmd, cmd_head->seqno, serclt->wr_off- serclt->rd_off);
+			ERRSYS_INFOPRINT("SERCLT=>clt:%d-socket:%d, not register devip port, but recv cmd:0x%x, seqno:%d, len:%d, refuse agent!!\n", 
+					serclt->cltid, serclt->nsocket, cmd_head->cmd, cmd_head->seqno, serclt->wr_off- serclt->rd_off);
 			serclt->error_count++;
 
 			serclt->wr_off = 0;
@@ -81,7 +141,11 @@ int serclt_recvdata(struct serclt_info *serclt)
 		remain_len = serclt->wr_off- serclt->rd_off;
 		packet = serclt->data_blob + serclt->rd_off;
 		if( serclt->net_op.transmitpacket != NULL){
-			serclt->net_op.transmitpacket(serclt->net_op.param,serclt->devip,serclt->devport,serclt->nsocket, packet, remain_len);
+			nret = serclt->net_op.transmitpacket(serclt->net_op.param,serclt->devip,serclt->devport,serclt->nsocket, packet, remain_len);
+			struct cmd_packet *pCmd = (struct cmd_packet *)packet;
+			ERRSYS_INFOPRINT("SERCLT=>send to dev[%s:%d] by clt:%d-socket:%d - cmd:0x%x- seqno:%d, cmdLen:%d-0x%x, nret=%d\n", serclt->devip, serclt->devport, 
+						serclt->cltid, serclt->nsocket, pCmd->cmd, pCmd->seqno, remain_len, pCmd->f.length, nret);
+			dump_file(packet, remain_len, serclt, 1);
 		}
 		serclt->wr_off = 0;
 		serclt->rd_off = 0;	
@@ -93,8 +157,12 @@ int serclt_writedata(struct serclt_info *serclt, void *data, int len)
 	struct evbuffer *output = bufferevent_get_output(serclt->evbuffer);
 	int retval = evbuffer_add(output, data, len);
 	if (retval == -1) {
-		ERRSYS_ERRPRINT("fail to send data length %d\n", len);
+		ERRSYS_ERRPRINT("SERCLT=>clt:%d-socket:%d fail to send data length %d\n",serclt->cltid, serclt->nsocket, len);
 	}
+	struct cmd_packet *pCmd = (struct cmd_packet *)data;
+	ERRSYS_INFOPRINT("SERCLT=>recv from dev[%s:%d] to clt:%d-socket:%d - cmd:0x%x- seqno:%d, cmdLen:%d-0x%x, nret=%d\n", serclt->devip, serclt->devport, 
+						serclt->cltid, serclt->nsocket, pCmd->cmd, pCmd->seqno, len, pCmd->f.length, retval);
+	dump_file(data, len, serclt, 0);
 	return retval;
 }
 
