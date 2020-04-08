@@ -65,30 +65,34 @@ int main(int argc, char** argv) {
 	struct agent_req *req;
 	struct cmd_packet *resp;
 
+	req = (struct agent_req *)buf;
+	req->agent_head.magic = AGENT_INIT_PACKET_HEAD_MAGIC;
+	req->agent_head.devip[0] = 192;
+	req->agent_head.devip[1] = 168;
+	req->agent_head.devip[2] = 11;
+	req->agent_head.devip[3] = 128;
+	req->agent_head.port = usport;
+	req->agent_head.cltid = 1;
+
+	write(sockfd, &req->agent_head, sizeof(struct agent_packet));  
+	printf("send targetinfo, usport:%d \n",usport);
+
 	uint8_t seqno = 12;
 	while(1){
 		 sleep(10);
 
-		 req = (struct agent_req *)buf;
-		 req->agent_head.magic = AGENT_PACKET_HEAD_MAGIC;
-		 req->agent_head.devip[0] = 192;
-		 req->agent_head.devip[1] = 168;
-		 req->agent_head.devip[2] = 245;
-		 req->agent_head.devip[3] = 128;
-		 req->agent_head.port = usport;
 		 req->cmd_head.seqno = seqno++;
-		 req->cmd_head.f.length = 8 + 12;
+		 req->cmd_head.f.length = 12;
 		 req->cmd_head.cmd = 0x12;
 		 
-         write(sockfd, buf, req->cmd_head.f.length + AGENT_PACKET_HEAD_LEN);  
+         write(sockfd, &req->cmd_head, req->cmd_head.f.length);  
 		 printf("send data seqno:%d, usport:%d \n", req->cmd_head.seqno, usport);
 		 
 		 sleep(1);
 		 
          n = read(sockfd, buf2, MAXLINE);  
 		 resp = (struct cmd_packet*)buf2;
-		 printf("recv data n=%d, cmd:%d, seqno:%d \n", n,resp->cmd, resp->seqno);
-             
+		 printf("recv data n=%d, cmd:%d, seqno:%d \n", n,resp->cmd, resp->seqno);             
     }   
     close(sockfd);  
     return 0;  
