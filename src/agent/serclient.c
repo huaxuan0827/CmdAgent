@@ -16,7 +16,7 @@
 
 #define MODNAME	 "[A15SC]"
 
-void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int flag)
+void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int flag, int bPrint)
 {
 	int i;
 	static FILE* fp = NULL;
@@ -24,6 +24,7 @@ void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int fl
 	struct tm *tmp_ptr = NULL;
 	time_t tnow;
 	char time_str[256];
+	char tmp_str[256] = {0};
 	
  	time(&tnow);
  	tmp_ptr = gmtime(&tnow);
@@ -42,7 +43,8 @@ void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int fl
 
 		mkdir("/tmp/log_dump",0755);
 		sprintf(szFileName, "/tmp/log_dump/agentdata_dump_%s",time_str);
-		printf("szFileName:%s \n", szFileName);
+		if(bPrint)
+			printf("create log_dump filename %s \n", szFileName);
 		fp = fopen(szFileName, "w");
 		nCount = 0;
 	}
@@ -51,19 +53,27 @@ void dump_file(uint8_t *proto, uint32_t size, struct serclt_info *serclt, int fl
 		return;
 	}
 
-	if( flag == 1)
-		fprintf(fp, "[%s] size=%d, clt:%d-socket:%d => dev:%s-port:%d\n", time_str, size, serclt->cltid, serclt->nsocket, serclt->devip, serclt->devport);
-	else
-		fprintf(fp, "[%s] size=%d, dev:%s-port:%d => clt:%d-socket:%d\n", time_str, size, serclt->devip, serclt->devport, serclt->cltid, serclt->nsocket);
-	nCount += size;
+	if( flag == 1){
+		sprintf(tmp_str, "[%s] size=%d, clt:%d-socket:%d => dev:%s-port:%d\n", time_str, size, serclt->cltid, serclt->nsocket, serclt->devip, serclt->devport);
+	}else{
+		sprintf(tmp_str, "[%s] size=%d, dev:%s-port:%d => clt:%d-socket:%d\n", time_str, size, serclt->devip, serclt->devport, serclt->cltid, serclt->nsocket);
+	}
+	if(bPrint)
+		printf("%s", tmp_str);
+	fprintf(fp, "%s", tmp_str);
 	
+	nCount += size;
 	for (i = 0;i < size;i++){
 		fprintf(fp, "%02x ", proto[i]);
+		if(bPrint)printf("%02x ", proto[i]);
 		if ((i & 0xF) == 0xF) {
 			fprintf(fp,"\n");
+			if(bPrint)printf("\n");
 		}
 	}
 	fprintf(fp, "\n");
+	if(bPrint)printf("\n");
+	
 	fflush(fp);
 }
 
@@ -82,6 +92,7 @@ int serclt_initialize(struct serclt_info *serclt, struct serclt_op *op)
 	serclt->devport = 0;
 	
 	serclt->net_op.param = op->param;
+	serclt->net_op.registerdevice = op->registerdevice;
 	serclt->net_op.transmitpacket = op->transmitpacket;
 	return 0;
 }
@@ -119,7 +130,8 @@ int serclt_recvdata(struct serclt_info *serclt)
 			serclt->devport = agent_head->port;
 			serclt->cltid = agent_head->cltid;
 			serclt->rd_off += AGENT_PACKET_HEAD_LEN;
-			
+
+			ERRSYS_INFOPRINT("SERCLT=>clt:%d-socket:%d, new devip:%s, port:%d\n",serclt->cltid, serclt->nsocket, serclt->devip, serclt->devport);		
 			if( serclt->net_op.registerdevice != NULL){
 				nret = serclt->net_op.registerdevice(serclt->net_op.param, serclt->devip, serclt->devport);
 				ERRSYS_INFOPRINT("SERCLT=>clt:%d-socket:%d, register devip:%s, port:%d, nret:%d\n",serclt->cltid, serclt->nsocket, serclt->devip, 
@@ -145,7 +157,7 @@ int serclt_recvdata(struct serclt_info *serclt)
 			struct cmd_packet *pCmd = (struct cmd_packet *)packet;
 			ERRSYS_INFOPRINT("SERCLT=>send to dev[%s:%d] by clt:%d-socket:%d - cmd:0x%x- seqno:%d, cmdLen:%d-0x%x, nret=%d\n", serclt->devip, serclt->devport, 
 						serclt->cltid, serclt->nsocket, pCmd->cmd, pCmd->seqno, remain_len, pCmd->f.length, nret);
-			dump_file(packet, remain_len, serclt, 1);
+			dump_file(packet, remain_len, serclt, 1, 1);
 		}
 		serclt->wr_off = 0;
 		serclt->rd_off = 0;	
@@ -162,7 +174,7 @@ int serclt_writedata(struct serclt_info *serclt, void *data, int len)
 	struct cmd_packet *pCmd = (struct cmd_packet *)data;
 	ERRSYS_INFOPRINT("SERCLT=>recv from dev[%s:%d] to clt:%d-socket:%d - cmd:0x%x- seqno:%d, cmdLen:%d-0x%x, nret=%d\n", serclt->devip, serclt->devport, 
 						serclt->cltid, serclt->nsocket, pCmd->cmd, pCmd->seqno, len, pCmd->f.length, retval);
-	dump_file(data, len, serclt, 0);
+	dump_file(data, len, serclt, 0, 1);
 	return retval;
 }
 

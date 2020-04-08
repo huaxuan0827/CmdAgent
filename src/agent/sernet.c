@@ -159,6 +159,7 @@ int sernet_initialize(struct sernet_info *sernet, const char *netpath, struct se
 	if( sernet->evlistener == NULL){
 		goto err4;	
 	}
+	sernet->ser_op.registerdevice = op->registerdevice;
 	sernet->ser_op.transmitpacket = op->transmitpacket;
 	sernet->ser_op.param = op->param;
 

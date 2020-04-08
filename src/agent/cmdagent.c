@@ -138,18 +138,18 @@ int cmdagnet_initconfig(struct cmdagent_info *agent)
 #if 0
 	int idx = 0;
 	unsigned short usport = 9900;
-
-	evthread_use_pthreads();//enable threads 
 	
 	agent->dev_num = 2;
 	for(idx = 0; idx < agent->dev_num; idx++){
 		strcpy(agent->dev_info[idx].ipaddr, "192.168.245.128");
 		agent->dev_info[idx].usport = usport+idx;
-		agent->dev_info[idx].rack_index = idx;
 	}
 #else
 	agent->dev_num = 0;
 #endif
+
+	//enable threads 
+	evthread_use_pthreads();
 	return 0;
 }
 
@@ -177,10 +177,10 @@ int main(int argc, char *argv[])
 		goto err2;
 	}
 	
-	if (signal_initialize(cmdagent) < 0) {
-		ERRSYS_FATALPRINT("Fail to register signal handler\n");
-		goto err3;
-	}
+	//if (signal_initialize(cmdagent) < 0) {
+	//	ERRSYS_FATALPRINT("Fail to register signal handler\n");
+	//	goto err3;
+	//}
 
 	if (parse_argument(argc, argv, cmdagent) < 0) {
 		ERRSYS_FATALPRINT("Fail to parse arguments\n");
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
 	task = cmdagent->tcluster->task;
 	
 	// wait all app startup.
-	sleep(5);
+	sleep(1);
 	if ((retval = cmdagent_tasks_initialize(cmdagent)) < 0) {
 		goto err6;
 	}
@@ -271,6 +271,9 @@ int cmdagent_register_device(void *param, const char *szdevip, unsigned short us
 		return -1;
 	}
 
+	strcpy(agent->dev_info[idx].ipaddr, szdevip);
+	agent->dev_info[idx].usport = usport;
+		
 	taskindex = CMDAGENT_TASK_DEVICE + idx;
 	sprintf(agent->dev_info[idx].taskname, CMDAGENT_TASK_NAME_DEVICE, idx);
 	agent->dev_info[idx].taskindex = taskindex;
@@ -288,6 +291,8 @@ int cmdagent_register_device(void *param, const char *szdevip, unsigned short us
 		ERRSYS_FATALPRINT("CMDAGENT Fail to startup task #%d, device ip=%s, port=%d\n", taskindex, szdevip, usport);
 		return -1;
 	}
+	agent->dev_num++;
+	
 	return 0;
 }
 
